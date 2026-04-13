@@ -49,18 +49,24 @@ pub enum Commands {
 }
 
 impl Commands {
-    pub fn to_entry(&self) -> Result<Option<WatchrEntry>, CliError> {
+    pub fn to_entry(
+        &self,
+    ) -> Result<Option<WatchrEntry>, CliError> {
         match self {
             Commands::Init => Ok(None),
             Commands::Watch { dir, ext, cmd, .. } => {
-                let ext = ext
-                    .as_ref()
-                    .map(|ext| ext.split(',').map(|x| x.to_string()).collect());
+                let ext = ext.as_ref().map(|ext| {
+                    ext.split(',')
+                        .map(|x| x.to_string())
+                        .collect()
+                });
 
                 let dir = dir.as_ref();
                 let cmd = cmd.as_ref();
 
-                if (dir.is_none() && cmd.is_some()) || (cmd.is_none() && dir.is_some()) {
+                if (dir.is_none() && cmd.is_some())
+                    || (cmd.is_none() && dir.is_some())
+                {
                     Err(CliError::MalformedEntry)
                 } else if dir.is_some() && cmd.is_some() {
                     Ok(Some(WatchrEntry {
@@ -79,7 +85,9 @@ impl Commands {
     pub fn config_path(&self) -> Option<&Path> {
         match self {
             Commands::Init => None,
-            Commands::Watch { config, .. } => config.as_ref().map(|c| c.as_path()),
+            Commands::Watch { config, .. } => {
+                config.as_ref().map(|c| c.as_path())
+            }
         }
     }
 }
@@ -102,7 +110,10 @@ mod tests {
             config: None,
             cmd: Some("cargo test".to_string()),
         };
-        assert!(matches!(watch.to_entry(), Err(CliError::MalformedEntry)));
+        assert!(matches!(
+            watch.to_entry(),
+            Err(CliError::MalformedEntry)
+        ));
     }
 
     #[test]
@@ -124,7 +135,10 @@ mod tests {
             config: None,
             cmd: None,
         };
-        assert!(matches!(watch.to_entry(), Err(CliError::MalformedEntry)));
+        assert!(matches!(
+            watch.to_entry(),
+            Err(CliError::MalformedEntry)
+        ));
     }
 
     #[test]
@@ -171,6 +185,9 @@ mod tests {
             cmd: None,
             config: Some(PathBuf::from("./")),
         };
-        assert_eq!(watch.config_path(), Some(PathBuf::from("./").as_path()));
+        assert_eq!(
+            watch.config_path(),
+            Some(PathBuf::from("./").as_path())
+        );
     }
 }
