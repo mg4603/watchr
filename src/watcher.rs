@@ -142,3 +142,90 @@ fn run_event_loop(rx: Receiver<WatchEvent>) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use std::time::Instant;
+
+    use notify_debouncer_full::DebouncedEvent;
+    use notify_debouncer_full::notify::ErrorKind;
+    use notify_debouncer_full::notify::event::{
+        Event, EventKind, ModifyKind,
+    };
+
+    fn create_debounced_event_result(
+        error: bool,
+    ) -> DebounceEventResult {
+        if error {
+            return Err(vec![notify::Error {
+                kind: ErrorKind::Generic("custom".to_string()),
+                paths: vec![PathBuf::from("./")],
+            }]);
+        }
+
+        Ok(vec![DebouncedEvent {
+            event: Event {
+                kind: EventKind::Modify(ModifyKind::Any),
+                paths: vec![PathBuf::from("src/main.rs")],
+                attrs: Default::default(),
+            },
+            time: Instant::now(),
+        }])
+    }
+
+    #[test]
+    fn test_handle_events_no_ext() {
+        let result = create_debounced_event_result(false);
+        let (tx, rx) = mpsc_channel();
+        handle_events(result, None, "pwd".to_string(), tx);
+
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(WatchEvent::Command(_))
+        ));
+    }
+
+    #[test]
+    fn test_handle_event_matching_ext() {
+        let result = create_debounced_event_result(false);
+        let (tx, rx) = mpsc_channel();
+        handle_events(
+            result,
+            Some(vec!["rs".to_string()]),
+            "pwd".to_string(),
+            tx,
+        );
+
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(WatchEvent::Command(_))
+        ));
+    }
+
+    #[test]
+    fn test_handle_event_no_matching_ext() {
+        let result = create_debounced_event_result(false);
+        let (tx, rx) = mpsc_channel();
+        handle_events(
+            result,
+            Some(vec!["txt".to_string()]),
+            "pwd".to_string(),
+            tx,
+        );
+
+        // mpsc::TryRecvError::Empty
+        assert!(matches!(rx.try_recv(), Err(..)));
+    }
+
+    #[test]
+    fn test_hand_event_error_result() {
+        let result = create_debounced_event_result(true);
+        let (tx, rx) = mpsc_channel();
+        handle_events(result, None, "pwd".to_string(), tx);
+
+        // mpsc::TryRecvError::Empty
+        assert!(matches!(rx.try_recv(), Err(..)))
+    }
+}
