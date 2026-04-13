@@ -1,11 +1,21 @@
+use std::path::PathBuf;
 use std::process;
-use std::sync::mpsc;
+use std::sync::mpsc::{
+    Receiver, Sender, channel as mpsc_channel,
+};
 use std::time::Duration;
 
-use notify_debouncer_full::{DebounceEventResult, new_debouncer, notify, notify::RecursiveMode};
+use notify_debouncer_full::notify::{
+    RecommendedWatcher, RecursiveMode,
+};
+use notify_debouncer_full::{
+    DebounceEventResult, Debouncer, NoCache, new_debouncer,
+    notify,
+};
 use thiserror::Error;
 
 use crate::config::WatchrConfig;
+use crate::entry::WatchrEntry;
 
 #[derive(Error, Debug)]
 pub enum WatcherError {
@@ -19,59 +29,109 @@ pub enum WatchEvent {
     Shutdown,
 }
 
-pub fn run_watch(config: WatchrConfig) -> Result<(), WatcherError> {
-    let (tx, rx) = mpsc::channel();
-    let mut debouncers = Vec::new();
-
-    for entry in config.entries {
-        let tx = tx.clone();
-
-        let mut debouncer = new_debouncer(
-            Duration::from_millis(config.debounce_ms),
-            None,
-            move |result: DebounceEventResult| match result {
-                Ok(events) => {
-                    for event in events {
-                        for path in event.paths.clone() {
-                            if !path.is_file() {
-                                continue;
-                            }
-                            if entry.ext.is_none() {
-                                let _ = tx.send(WatchEvent::Command(entry.command.clone()));
-                                continue;
-                            }
-
-                            let ext = path.extension();
-                            for ext_ in entry.ext.clone().unwrap() {
-                                if ext_ == ext.unwrap().display().to_string() {
-                                    let _ = tx.send(WatchEvent::Command(entry.command.clone()));
-                                }
-                            }
-                        }
-                    }
-                }
-                Err(errors) => {
-                    for e in errors {
-                        println!("{:?}", e);
-                    }
-                }
-            },
-        )?;
-
-        for dir in entry.dirs {
-            let dir = dir.clone();
-            debouncer.watch(dir, RecursiveMode::Recursive)?;
-        }
-        debouncers.push(debouncer);
-    }
+pub fn run_watch(
+    config: WatchrConfig,
+) -> Result<(), WatcherError> {
+    let (tx, rx) = mpsc_channel();
+    let _debouncers = create_debouncers(
+        config.debounce_ms,
+        config.entries,
+        tx.clone(),
+    )?;
 
     // drop initial sender after creating clones
     drop(tx);
 
+    run_event_loop(rx);
+    Ok(())
+}
+
+fn handle_events(
+    result: DebounceEventResult,
+    exts: Option<Vec<String>>,
+    command: String,
+    tx: Sender<WatchEvent>,
+) {
+    match result {
+        Ok(events) => {
+            if exts.as_ref().is_none() {
+                let _ = tx
+                    .send(WatchEvent::Command(command.clone()));
+                return;
+            }
+
+            let paths: Vec<PathBuf> = events
+                .into_iter()
+                .flat_map(|event| event.paths.clone())
+                .collect();
+
+            for path in paths {
+                if !path.is_file() {
+                    continue;
+                }
+
+                if let (Some(ext), Some(exts)) = (
+                    path.extension().and_then(|e| e.to_str()),
+                    exts.as_deref(),
+                ) && exts.iter().any(|e| e == ext)
+                {
+                    let _ = tx.send(WatchEvent::Command(
+                        command.clone(),
+                    ));
+                    return;
+                }
+            }
+        }
+        Err(errors) => {
+            for e in errors {
+                println!("{:?}", e);
+            }
+        }
+    }
+}
+
+fn create_debouncers(
+    debounce_ms: u64,
+    entries: Vec<WatchrEntry>,
+    tx: Sender<WatchEvent>,
+) -> Result<
+    Vec<Debouncer<RecommendedWatcher, NoCache>>,
+    WatcherError,
+> {
+    let mut debouncers = Vec::new();
+    for entry in entries {
+        let tx = tx.clone();
+
+        let mut debouncer = new_debouncer(
+            Duration::from_millis(debounce_ms),
+            None,
+            move |result: DebounceEventResult| {
+                handle_events(
+                    result,
+                    entry.ext.clone(),
+                    entry.command.clone(),
+                    tx.clone(),
+                );
+            },
+        )?;
+
+        for dir in &entry.dirs {
+            debouncer.watch(dir, RecursiveMode::Recursive)?;
+        }
+        debouncers.push(debouncer);
+    }
+    Ok(debouncers)
+}
+
+fn run_event_loop(rx: Receiver<WatchEvent>) {
     loop {
         match rx.recv() {
             Ok(WatchEvent::Command(cmd)) => {
-                let output = process::Command::new("sh").arg("-c").arg(&cmd).output();
+                let output = process::Command::new("sh")
+                    .arg("-c")
+                    .arg(&cmd)
+                    .output();
+
                 match output {
                     Ok(out) => println!("{:?}", out),
                     Err(e) => println!("{:?}", e),
@@ -81,5 +141,4 @@ pub fn run_watch(config: WatchrConfig) -> Result<(), WatcherError> {
             Err(_) => break,
         }
     }
-    Ok(())
 }
