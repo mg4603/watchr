@@ -28,7 +28,9 @@ fn default_debounce_ms() -> u64 {
     500
 }
 
-pub fn read_config(path: &Path) -> Result<WatchrConfig, ConfigError> {
+pub fn read_config(
+    path: &Path,
+) -> Result<WatchrConfig, ConfigError> {
     let config_str = fs::read_to_string(path)?;
     let config: WatchrConfig = toml::from_str(&config_str)?;
     Ok(config)
@@ -39,7 +41,8 @@ mod tests {
     use super::*;
 
     fn create_config_file(path: &Path, malformed: bool) {
-        let injection = (if malformed { "[" } else { "" }).to_string();
+        let injection =
+            (if malformed { "[" } else { "" }).to_string();
 
         let config = format!(
             r####"{}debounce_ms = 500
@@ -96,6 +99,9 @@ command = "pwd"
         create_config_file(&file_path, true);
 
         let result = read_config(&file_path);
-        assert!(matches!(result, Err(ConfigError::Deserialize(_))));
+        assert!(matches!(
+            result,
+            Err(ConfigError::Deserialize(_))
+        ));
     }
 }
