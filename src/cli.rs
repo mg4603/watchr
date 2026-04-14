@@ -90,6 +90,13 @@ impl Commands {
             }
         }
     }
+
+    pub fn is_init(&self) -> bool {
+        match self {
+            Commands::Init => true,
+            Commands::Watch { .. } => false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -189,5 +196,22 @@ mod tests {
             watch.config_path(),
             Some(PathBuf::from("./").as_path())
         );
+    }
+
+    #[test]
+    fn test_is_init_true() {
+        let init = Commands::Init;
+        assert!(init.is_init());
+    }
+
+    #[test]
+    fn test_is_init_false() {
+        let watch = Commands::Watch {
+            dir: None,
+            ext: None,
+            cmd: None,
+            config: None,
+        };
+        assert!(!watch.is_init());
     }
 }
