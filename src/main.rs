@@ -2,6 +2,7 @@
 mod cli;
 mod config;
 mod entry;
+mod init;
 mod resolver;
 mod watcher;
 
@@ -12,6 +13,7 @@ use thiserror::Error;
 
 use crate::cli::{Cli, CliError};
 use crate::config::{ConfigError, WatchrConfig, read_config};
+use crate::init::{InitError, run_init};
 use crate::resolver::{ResolverError, find_config_file};
 use crate::watcher::{WatcherError, run_watch};
 
@@ -37,6 +39,9 @@ enum MainError {
 
     #[error("Directory not found: {0}")]
     DirNotFound(PathBuf),
+
+    #[error("InitError: {0}")]
+    InitError(#[from] InitError),
 }
 
 fn main() {
@@ -49,40 +54,47 @@ fn main() {
 fn run() -> Result<(), MainError> {
     let cli = Cli::parse();
 
-    let cli_entry = cli.command.to_entry()?;
-    let mut config_path =
-        cli.command.config_path().map(|p| p.to_path_buf());
-
-    if config_path.is_none() {
-        config_path =
-            find_config_file(&std::env::current_dir()?).ok();
-    }
-
-    let config = if let Some(config_path) = config_path {
-        read_config(config_path.as_path())?
-    } else if let Some(entry) = cli_entry {
-        WatchrConfig {
-            debounce_ms: 500,
-            entries: vec![entry],
-        }
+    if cli.command.is_init() {
+        run_init(&std::env::current_dir()?)?;
+        println!(".watchr.toml created");
     } else {
-        return Err(MainError::NoWatcherEntriesProvided);
-    };
+        let cli_entry = cli.command.to_entry()?;
+        let mut config_path =
+            cli.command.config_path().map(|p| p.to_path_buf());
 
-    if config.entries.is_empty() {
-        return Err(MainError::NoWatcherEntriesProvided);
+        if config_path.is_none() {
+            config_path =
+                find_config_file(&std::env::current_dir()?)
+                    .ok();
+        }
+
+        let config = if let Some(config_path) = config_path {
+            read_config(config_path.as_path())?
+        } else if let Some(entry) = cli_entry {
+            WatchrConfig {
+                debounce_ms: 500,
+                entries: vec![entry],
+            }
+        } else {
+            return Err(MainError::NoWatcherEntriesProvided);
+        };
+
+        if config.entries.is_empty() {
+            return Err(MainError::NoWatcherEntriesProvided);
+        }
+
+        if let Some(path) = config
+            .entries
+            .iter()
+            .flat_map(|e| e.dirs.iter())
+            .find(|p| !p.is_dir())
+        {
+            return Err(MainError::DirNotFound(
+                path.to_path_buf(),
+            ));
+        }
+
+        run_watch(config)?;
     }
-
-    if let Some(path) = config
-        .entries
-        .iter()
-        .flat_map(|e| e.dirs.iter())
-        .find(|p| !p.is_dir())
-    {
-        return Err(MainError::DirNotFound(path.to_path_buf()));
-    }
-
-    run_watch(config)?;
-
     Ok(())
 }
