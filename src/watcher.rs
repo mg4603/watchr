@@ -21,6 +21,9 @@ use crate::entry::WatchrEntry;
 pub enum WatcherError {
     #[error("notify-debouncer error: {0}")]
     Notify(#[from] notify::Error),
+
+    #[error("failed to create shutdown handler: {0}")]
+    SignalHandler(#[from] ctrlc::Error),
 }
 
 #[derive(Debug)]
@@ -33,6 +36,9 @@ pub fn run_watch(
     config: WatchrConfig,
 ) -> Result<(), WatcherError> {
     let (tx, rx) = mpsc_channel();
+
+    create_shutdown_handler(tx.clone())?;
+
     let _debouncers = create_debouncers(
         config.debounce_ms,
         config.entries,
@@ -43,6 +49,15 @@ pub fn run_watch(
     drop(tx);
 
     run_event_loop(rx);
+    Ok(())
+}
+
+fn create_shutdown_handler(
+    tx: Sender<WatchEvent>,
+) -> Result<(), WatcherError> {
+    ctrlc::try_set_handler(move || {
+        let _ = tx.send(WatchEvent::Shutdown);
+    })?;
     Ok(())
 }
 
@@ -137,7 +152,10 @@ fn run_event_loop(rx: Receiver<WatchEvent>) {
                     Err(e) => println!("{:?}", e),
                 }
             }
-            Ok(WatchEvent::Shutdown) => {}
+            Ok(WatchEvent::Shutdown) => {
+                println!("Shutting down gracefully...");
+                break;
+            }
             Err(_) => break,
         }
     }
