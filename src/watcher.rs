@@ -1,3 +1,12 @@
+//! File watcher orchestration.
+//!
+//! Provides the implementation for the `watch` command.
+//!
+//! This module initializes filesystem watchers for all
+//! configured entries and dispatches commands when matching
+//! file changes occur.
+//!
+//! See [`WatcherError`] for failure modes.
 use std::path::PathBuf;
 use std::process;
 use std::sync::mpsc::{
@@ -17,21 +26,72 @@ use thiserror::Error;
 use crate::config::WatchrConfig;
 use crate::entry::WatchrEntry;
 
+/// Errors produced during watcher initialization and runtime
+/// setup.
 #[derive(Error, Debug)]
 pub enum WatcherError {
+    /// Failure originating from the notify/debouncer layer.
+    ///
+    /// This includes:
+    /// - Debouncer creation failures
+    /// - Debouncer watch registration failures
     #[error("notify-debouncer error: {0}")]
     Notify(#[from] notify::Error),
 
+    /// Failure when installing the Ctrl+C signal handler.
     #[error("failed to create shutdown handler: {0}")]
     SignalHandler(#[from] ctrlc::Error),
 }
 
+/// Events emitted by the watcher system and consumed by the
+/// event loop.
 #[derive(Debug)]
 pub enum WatchEvent {
+    /// Execute the associated command.
     Command(String),
+
+    /// Terminate the watcher loop gracefully.
     Shutdown,
 }
 
+/// Runs the file watching system.
+///
+/// Initializes:
+/// - A shutdown signal handler (Ctrl+C)
+/// - Debounced filesystem watchers for all configured entries
+/// - The main event loop
+///
+/// This functions blocks until a shutdown event is received.
+///
+/// # Arguments
+/// * `config` - Application configuration containing watcher
+///   entries
+///
+/// # Errors
+///
+/// Returns [`WatcherError`] if:
+/// - The debouncer cannot be created
+/// - A directory cannot be registered for watching
+/// - The signal handler cannot be installed
+///
+/// # Examples
+///
+/// ```no_run
+/// use watchr::entry::WatchrEntry;
+///
+/// let entry = WatchrEntry {
+///     name: "test",
+///     dirs: vec![PathBuf::from(".")],
+///     ext: None,
+///     command: "cargo test".to_string(),
+/// }
+/// let config = WatchrConfig{
+///     debounce_ms: 500,
+///     entries: vec![entry]
+/// }
+///
+/// run_watch(config)?
+/// ```
 pub fn run_watch(
     config: WatchrConfig,
 ) -> Result<(), WatcherError> {
@@ -52,6 +112,25 @@ pub fn run_watch(
     Ok(())
 }
 
+/// Installs a Ctrl+C handler that triggers a graceful shutdown.
+///
+/// When SIGINT or SIGTERM is received, [`WatchEvent::Shutdown`]
+/// message is sent through the provided channel.
+///
+/// # Arguments
+///
+/// * `tx` - Channel sender used to propagate shutdown events
+///
+/// # Errors
+/// Returns [`WatcherError::SignalHandler`] if the handler cannot
+/// be registered.
+///
+/// # Examples
+///
+/// ```no_run
+/// let (tx, _) = std::sync::mpsc::channel();
+/// let ctrlc_handler = create_shutdown_handler(tx)?;
+/// ```
 fn create_shutdown_handler(
     tx: Sender<WatchEvent>,
 ) -> Result<(), WatcherError> {
@@ -61,6 +140,25 @@ fn create_shutdown_handler(
     Ok(())
 }
 
+/// Processes debounced filesystem events and emits commands when
+/// matched.
+///
+/// If no extension filter is configured, any event triggers the
+/// command. Otherwise, only file changes matching one of the
+/// provided extensions will trigger execution.
+///
+/// # Arguments
+/// * `result` - Debounced event result from the notify layer
+/// * `exts` - Optional list of file extensions to filter on
+/// * `command` - Command to execute when a match occurs
+/// * `tx` - Channel sender used to emit [`WatchEvent`]s
+///
+///
+/// # Examples
+/// ```no_run
+/// let (tx, _) = std::sync::mpsc::channel();
+/// handle_events(Ok(vec![]), None, "cargo test".into(), tx);
+/// ```
 fn handle_events(
     result: DebounceEventResult,
     exts: Option<Vec<String>>,
@@ -105,6 +203,43 @@ fn handle_events(
     }
 }
 
+/// Creates and registers filesystem watchers for each entry.
+///
+/// Each entry results in a dedicated debouncer configured with:
+/// - The specified debounce duration
+/// - A callback that filters events and emits commands
+///
+/// # Arguments
+/// * `debounce_ms` - Debounce window in milliseconds
+/// * `entries` - Watch configuration entries
+/// * `tx` - Channel sender used to emit [`WatchEvent`]s
+///
+/// # Returns
+///
+/// A collection of active debouncers. They must be kept alive
+/// for watcher to remain active.
+///
+/// # Errors
+///
+/// Returns [`WatcherError`] if:
+/// - A debouncer cannot be created
+/// - A directory cannot be registered for watching
+///
+/// # Examples
+/// ```no_run
+/// use watchr::entry::WatchrEntry;
+/// use std::path::PathBuf;
+///
+/// let (tx, _) = std::sync::mpsc::channel();
+/// let entry = WatchrEntry{
+///     name: None,
+///     dirs: [PathBuf::from(".")]
+///     ext: None,
+///     command: "cargo test".to_string(),
+/// };
+///
+/// let _ = create_debouncers(500, vec![entry], tx)?;
+/// ```
 fn create_debouncers(
     debounce_ms: u64,
     entries: Vec<WatchrEntry>,
@@ -138,6 +273,23 @@ fn create_debouncers(
     Ok(debouncers)
 }
 
+/// Runs the main event loop, consumeing [`WatchEvent`]s.
+///
+/// Behavior:
+/// - Executes shell commands for [`WatchEvent::Command`]
+/// - Terminates cleanly on [`WatchEvent::Shutdown`]
+/// - Exits if the channel is closed
+///
+/// Commands are executed via `sh -c`.
+///
+/// # Arguments
+/// * `rx` - Channel receiver for incoming [`WatchEvent`]s
+///
+/// # Examples
+/// ```no_run
+/// let (_tx, rx) = std::sync::mpsc::channel();
+/// run_event_loop(rx);
+/// ```
 fn run_event_loop(rx: Receiver<WatchEvent>) {
     loop {
         match rx.recv() {

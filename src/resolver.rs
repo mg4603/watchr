@@ -1,13 +1,34 @@
+//! Find the configuration file at the specified directory
+//! or by walking up the directory tree.
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
+/// Errors that occur when trying to find the configuration
+/// file.
 #[derive(Debug, Error)]
 pub enum ResolverError {
+    /// Raised if configuration file not found at the specified
+    /// directory or parent directories.
     #[error("config file not found")]
     NotFound,
 }
 
+/// Find the configuration file by checking the specified
+/// directory or walking up the directory tree.
+///
+/// The search starts at `path` and proceeds upward through its
+/// parent directories until the file is found or the filesystem
+/// root is reached.
+///
+/// `path` is expected to be a directory. If a file path is
+/// provided, the search will start from that path directly.
+///
+/// # Errors
+///
+/// Returns a `[ResolverError]` in the following cases:
+/// - If no config file is found in the specified directory
+///   or by walking up the directory tree
 pub fn find_config_file(
     path: &Path,
 ) -> Result<PathBuf, ResolverError> {
