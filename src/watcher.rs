@@ -54,6 +54,41 @@ pub enum WatchEvent {
     Shutdown,
 }
 
+/// Prints the output of a command execution, including status
+/// and output/error messages.
+fn print_output(
+    cmd: &str,
+    output: Result<process::Output, std::io::Error>,
+) {
+    println!("$ {}", cmd);
+
+    match output {
+        Ok(out) if out.status.success() => {
+            println!("✓ success");
+            match String::from_utf8_lossy(&out.stdout).trim() {
+                "" => println!("(no output)"),
+                out => println!("{}", out),
+            }
+        }
+        Ok(out) => {
+            match out.status.code() {
+                Some(code) => {
+                    println!("✗ failed (exit code {})", code)
+                }
+                None => println!("✗ failed (terminated)"),
+            }
+
+            match String::from_utf8_lossy(&out.stderr).trim() {
+                "" => eprintln!("(no output)"),
+                err => eprintln!("{}", err),
+            }
+        }
+        Err(e) => {
+            println!("✗ failed to spawn: {}", e);
+        }
+    }
+}
+
 /// Runs the file watching system.
 ///
 /// Initializes:
@@ -299,10 +334,7 @@ fn run_event_loop(rx: Receiver<WatchEvent>) {
                     .arg(&cmd)
                     .output();
 
-                match output {
-                    Ok(out) => println!("{:?}", out),
-                    Err(e) => println!("{:?}", e),
-                }
+                print_output(&cmd, output)
             }
             Ok(WatchEvent::Shutdown) => {
                 println!("Shutting down gracefully...");
