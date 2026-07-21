@@ -8,7 +8,7 @@ use std::path::Path;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::entry::WatchrEntry;
+use crate::entry::WatcherEntry;
 
 /// Errors that can occur while reading or parsing a configuration
 /// file.
@@ -57,7 +57,7 @@ pub struct WatchrConfig {
     /// file extension filters and a command to execute.
     /// Corresponds to `[[watcher]]` section in TOML.
     #[serde(rename = "watcher")]
-    pub entries: Vec<WatchrEntry>,
+    pub entries: Vec<WatcherEntry>,
 }
 
 /// Default debounce time in milliseconds.

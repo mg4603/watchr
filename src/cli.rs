@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use thiserror::Error;
 
-use crate::entry::WatchrEntry;
+use crate::entry::WatcherEntry;
 
 /// Command-line interface for watcher.
 ///
@@ -90,7 +90,7 @@ pub enum Commands {
 }
 
 impl Commands {
-    /// Converts CLI arguments into a [`WatchrEntry`] when
+    /// Converts CLI arguments into a [`WatcherEntry`] when
     /// `--dir` and `--cmd` are both provided.
     ///
     /// # Errors
@@ -116,7 +116,7 @@ impl Commands {
     ///   ```
     pub fn to_entry(
         &self,
-    ) -> Result<Option<WatchrEntry>, CliError> {
+    ) -> Result<Option<WatcherEntry>, CliError> {
         match self {
             Commands::Init => Ok(None),
             Commands::Watch { dir, ext, cmd, .. } => {
@@ -134,7 +134,7 @@ impl Commands {
                 {
                     Err(CliError::MalformedEntry)
                 } else if dir.is_some() && cmd.is_some() {
-                    Ok(Some(WatchrEntry {
+                    Ok(Some(WatcherEntry {
                         name: None,
                         dirs: vec![dir.unwrap().to_path_buf()],
                         ext,
@@ -267,7 +267,7 @@ mod tests {
 
         assert!(matches!(
             watch.to_entry().unwrap(),
-            Some(WatchrEntry { .. })
+            Some(WatcherEntry { .. })
         ));
         let entry = watch.to_entry().unwrap().unwrap();
         assert_eq!(entry.dirs, vec![PathBuf::from("./")]);

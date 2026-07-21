@@ -1,6 +1,6 @@
 //! Watcher entry data structure.
 //!
-//! This module defines `WatchrEntry`, which represents a
+//! This module defines `WatcherEntry`, which represents a
 //! single watcher configuration. Each entry specifies
 //! which directories to monitor, optional file extension
 //! filters, and the command to execute on file changes.
@@ -26,7 +26,7 @@ use serde::Deserialize;
 /// command = "cargo build"
 /// ```
 #[derive(Debug, Deserialize)]
-pub struct WatchrEntry {
+pub struct WatcherEntry {
     /// Optional descriptive name for this watcher
     #[allow(dead_code)]
     pub name: Option<String>,

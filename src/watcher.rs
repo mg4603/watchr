@@ -24,7 +24,7 @@ use notify_debouncer_full::{
 use thiserror::Error;
 
 use crate::config::WatchrConfig;
-use crate::entry::WatchrEntry;
+use crate::entry::WatcherEntry;
 
 /// Errors produced during watcher initialization and runtime
 /// setup.
@@ -112,9 +112,9 @@ fn print_output(
 /// # Examples
 ///
 /// ```no_run
-/// use watchr::entry::WatchrEntry;
+/// use watchr::entry::WatcherEntry;
 ///
-/// let entry = WatchrEntry {
+/// let entry = WatcherEntry {
 ///     name: "test",
 ///     dirs: vec![PathBuf::from(".")],
 ///     ext: None,
@@ -262,11 +262,11 @@ fn handle_events(
 ///
 /// # Examples
 /// ```no_run
-/// use watchr::entry::WatchrEntry;
+/// use watchr::entry::WatcherEntry;
 /// use std::path::PathBuf;
 ///
 /// let (tx, _) = std::sync::mpsc::channel();
-/// let entry = WatchrEntry{
+/// let entry = WatcherEntry{
 ///     name: None,
 ///     dirs: [PathBuf::from(".")]
 ///     ext: None,
@@ -277,7 +277,7 @@ fn handle_events(
 /// ```
 fn create_debouncers(
     debounce_ms: u64,
-    entries: Vec<WatchrEntry>,
+    entries: Vec<WatcherEntry>,
     tx: Sender<WatchEvent>,
 ) -> Result<
     Vec<Debouncer<RecommendedWatcher, NoCache>>,
