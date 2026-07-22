@@ -1,7 +1,7 @@
 //! Configuration file parsing and validation.
 //!
 //! This module handles reading `.watchr.toml` files and
-//! deserializing them into `WatchrConfig` structs.
+//! deserializing them into `WatcherConfig` structs.
 use std::fs;
 use std::path::Path;
 
@@ -43,7 +43,7 @@ pub enum ConfigError {
 /// command = "cargo test"
 /// ```
 #[derive(Debug, Deserialize)]
-pub struct WatchrConfig {
+pub struct WatcherConfig {
     /// Debounce time in milliseconds.
     ///
     /// Groups rapid file changes within this window.
@@ -90,9 +90,9 @@ fn default_debounce_ms() -> u64 {
 /// ```
 pub fn read_config(
     path: &Path,
-) -> Result<WatchrConfig, ConfigError> {
+) -> Result<WatcherConfig, ConfigError> {
     let config_str = fs::read_to_string(path)?;
-    let config: WatchrConfig = toml::from_str(&config_str)?;
+    let config: WatcherConfig = toml::from_str(&config_str)?;
     Ok(config)
 }
 

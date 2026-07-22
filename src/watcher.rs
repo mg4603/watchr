@@ -23,7 +23,7 @@ use notify_debouncer_full::{
 };
 use thiserror::Error;
 
-use crate::config::WatchrConfig;
+use crate::config::WatcherConfig;
 use crate::entry::WatcherEntry;
 
 /// Errors produced during watcher initialization and runtime
@@ -120,7 +120,7 @@ fn print_output(
 ///     ext: None,
 ///     command: "cargo test".to_string(),
 /// }
-/// let config = WatchrConfig{
+/// let config = WatcherConfig{
 ///     debounce_ms: 500,
 ///     entries: vec![entry]
 /// }
@@ -128,7 +128,7 @@ fn print_output(
 /// run_watch(config)?
 /// ```
 pub fn run_watch(
-    config: WatchrConfig,
+    config: WatcherConfig,
 ) -> Result<(), WatcherError> {
     let (tx, rx) = mpsc_channel();
 

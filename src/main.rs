@@ -26,7 +26,7 @@ use clap::Parser;
 use thiserror::Error;
 
 use crate::cli::{Cli, CliError};
-use crate::config::{ConfigError, WatchrConfig, read_config};
+use crate::config::{ConfigError, WatcherConfig, read_config};
 use crate::init::{InitError, run_init};
 use crate::resolver::{ResolverError, find_config_file};
 use crate::watcher::{WatcherError, run_watch};
@@ -130,7 +130,7 @@ fn run() -> Result<(), MainError> {
         let config = if let Some(config_path) = config_path {
             read_config(config_path.as_path())?
         } else if let Some(entry) = cli_entry {
-            WatchrConfig {
+            WatcherConfig {
                 debounce_ms: 500,
                 entries: vec![entry],
             }
