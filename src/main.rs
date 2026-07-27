@@ -24,6 +24,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use thiserror::Error;
+use tracing_subscriber::EnvFilter;
 
 use crate::cli::{Cli, CliError};
 use crate::config::{ConfigError, WatcherConfig, read_config};
@@ -91,7 +92,7 @@ enum MainError {
 /// ```
 fn main() {
     let cli = Cli::parse();
-
+    init_tracing(cli.verbose);
     if let Err(e) = run(cli) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
@@ -161,4 +162,18 @@ fn run(cli: Cli) -> Result<(), MainError> {
         run_watch(config)?;
     }
     Ok(())
+}
+
+fn init_tracing(verbosity: u8) {
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| {
+            let level = match verbosity {
+                0 => "off",
+                1 => "info",
+                2 => "debug",
+                _ => "trace",
+            };
+            EnvFilter::new(level)
+        });
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 }
