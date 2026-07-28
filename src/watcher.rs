@@ -232,7 +232,7 @@ fn handle_events(
         }
         Err(errors) => {
             for e in errors {
-                println!("{:?}", e);
+                tracing::error!(error = %e, "failed to process file watch event");
             }
         }
     }
