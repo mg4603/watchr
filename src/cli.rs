@@ -25,6 +25,10 @@ pub struct Cli {
     /// The subcommand to execute.
     #[command(subcommand)]
     pub command: Commands,
+
+    /// Increase logging verbosity (-v, -vv, -vvv)
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 }
 
 /// Errors that can occur during CLI argument validation.

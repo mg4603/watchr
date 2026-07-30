@@ -24,6 +24,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use thiserror::Error;
+use tracing_subscriber::EnvFilter;
 
 use crate::cli::{Cli, CliError};
 use crate::config::{ConfigError, WatcherConfig, read_config};
@@ -90,7 +91,9 @@ enum MainError {
 /// $ watchr
 /// ```
 fn main() {
-    if let Err(e) = run() {
+    let cli = Cli::parse();
+    init_tracing(cli.verbose);
+    if let Err(e) = run(cli) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }
@@ -98,8 +101,13 @@ fn main() {
 
 /// Main orchestrator for the `watchr` application.
 ///
-/// Parses command-line arguments, initializes configuration
-/// file, and starts the file watcher.
+/// Initializes a configuration file if the `init` command is
+/// used, or resolves configuration, validates directories,
+/// and starts the file watcher for the `watch` command.
+///
+/// # Arguments
+///
+/// * `cli` - Parsed command-line arguments
 ///
 /// # Errors
 ///
@@ -110,9 +118,7 @@ fn main() {
 ///   exist.
 /// - there is an error reading the config file or parsing
 ///   CLI arguments.
-fn run() -> Result<(), MainError> {
-    let cli = Cli::parse();
-
+fn run(cli: Cli) -> Result<(), MainError> {
     if cli.command.is_init() {
         run_init(&std::env::current_dir()?)?;
         println!(".watchr.toml created");
@@ -156,4 +162,18 @@ fn run() -> Result<(), MainError> {
         run_watch(config)?;
     }
     Ok(())
+}
+
+fn init_tracing(verbosity: u8) {
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| {
+            let level = match verbosity {
+                0 => "off",
+                1 => "info",
+                2 => "debug",
+                _ => "trace",
+            };
+            EnvFilter::new(level)
+        });
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 }
