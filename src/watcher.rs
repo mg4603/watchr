@@ -60,10 +60,20 @@ pub enum WatchEvent {
 
 /// Prints the output of a command execution, including status
 /// and output/error messages.
+///
+/// # Arguments
+/// * `cmd` - The command that was executed
+/// * `name` - Optional name of the watcher entry that triggered
+///   this command
+/// * `output` - Result of running the command
 fn print_output(
     cmd: &str,
+    name: Option<&str>,
     output: Result<process::Output, std::io::Error>,
 ) {
+    if let Some(name) = name {
+        println!("[{}]", name);
+    }
     println!("$ {}", cmd);
 
     match output {
@@ -338,13 +348,13 @@ fn create_debouncers(
 fn run_event_loop(rx: Receiver<WatchEvent>) {
     loop {
         match rx.recv() {
-            Ok(WatchEvent::Command { cmd, name: _ }) => {
+            Ok(WatchEvent::Command { cmd, name }) => {
                 let output = process::Command::new("sh")
                     .arg("-c")
                     .arg(&cmd)
                     .output();
 
-                print_output(&cmd, output)
+                print_output(&cmd, name.as_deref(), output);
             }
             Ok(WatchEvent::Shutdown) => {
                 println!("Shutting down gracefully...");
@@ -402,6 +412,23 @@ mod tests {
         assert!(matches!(
             rx.try_recv(),
             Ok(WatchEvent::Command { .. })
+        ));
+    }
+
+    #[test]
+    fn test_handle_events_name_in_emitted_watch_event() {
+        let result = create_debounced_event_result(false);
+        let (tx, rx) = mpsc_channel();
+        handle_events(
+            result,
+            Some("test".to_string()),
+            None,
+            "pwd".to_string(),
+            tx,
+        );
+        assert!(matches!(
+                rx.try_recv(),
+                Ok(WatchEvent::Command { name: Some(ref n), ..}) if n == "test"
         ));
     }
 
