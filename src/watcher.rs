@@ -48,7 +48,11 @@ pub enum WatcherError {
 #[derive(Debug)]
 pub enum WatchEvent {
     /// Execute the associated command.
-    Command(String),
+    ///
+    /// `name` is the optional name of the watcher entry that
+    /// triggered this event, used to identify which watcher's
+    /// output is being shown.
+    Command { cmd: String, name: Option<String> },
 
     /// Terminate the watcher loop gracefully.
     Shutdown,
@@ -56,10 +60,20 @@ pub enum WatchEvent {
 
 /// Prints the output of a command execution, including status
 /// and output/error messages.
+///
+/// # Arguments
+/// * `cmd` - The command that was executed
+/// * `name` - Optional name of the watcher entry that triggered
+///   this command
+/// * `output` - Result of running the command
 fn print_output(
     cmd: &str,
+    name: Option<&str>,
     output: Result<process::Output, std::io::Error>,
 ) {
+    if let Some(name) = name {
+        println!("[{}]", name);
+    }
     println!("$ {}", cmd);
 
     match output {
@@ -184,6 +198,7 @@ fn create_shutdown_handler(
 ///
 /// # Arguments
 /// * `result` - Debounced event result from the notify layer
+/// * `name` - Optional name of watcher entry
 /// * `exts` - Optional list of file extensions to filter on
 /// * `command` - Command to execute when a match occurs
 /// * `tx` - Channel sender used to emit [`WatchEvent`]s
@@ -192,10 +207,11 @@ fn create_shutdown_handler(
 /// # Examples
 /// ```no_run
 /// let (tx, _) = std::sync::mpsc::channel();
-/// handle_events(Ok(vec![]), None, "cargo test".into(), tx);
+/// handle_events(Ok(vec![]), None, None, "cargo test".into(), tx);
 /// ```
 fn handle_events(
     result: DebounceEventResult,
+    name: Option<String>,
     exts: Option<Vec<String>>,
     command: String,
     tx: Sender<WatchEvent>,
@@ -203,8 +219,10 @@ fn handle_events(
     match result {
         Ok(events) => {
             if exts.as_ref().is_none() {
-                let _ = tx
-                    .send(WatchEvent::Command(command.clone()));
+                let _ = tx.send(WatchEvent::Command {
+                    cmd: command.clone(),
+                    name: name.clone(),
+                });
                 return;
             }
 
@@ -223,9 +241,10 @@ fn handle_events(
                     exts.as_deref(),
                 ) && exts.iter().any(|e| e == ext)
                 {
-                    let _ = tx.send(WatchEvent::Command(
-                        command.clone(),
-                    ));
+                    let _ = tx.send(WatchEvent::Command {
+                        cmd: command.clone(),
+                        name: name.clone(),
+                    });
                     return;
                 }
             }
@@ -293,6 +312,7 @@ fn create_debouncers(
             move |result: DebounceEventResult| {
                 handle_events(
                     result,
+                    entry.name.clone(),
                     entry.ext.clone(),
                     entry.command.clone(),
                     tx.clone(),
@@ -328,13 +348,13 @@ fn create_debouncers(
 fn run_event_loop(rx: Receiver<WatchEvent>) {
     loop {
         match rx.recv() {
-            Ok(WatchEvent::Command(cmd)) => {
+            Ok(WatchEvent::Command { cmd, name }) => {
                 let output = process::Command::new("sh")
                     .arg("-c")
                     .arg(&cmd)
                     .output();
 
-                print_output(&cmd, output)
+                print_output(&cmd, name.as_deref(), output);
             }
             Ok(WatchEvent::Shutdown) => {
                 println!("Shutting down gracefully...");
@@ -381,11 +401,34 @@ mod tests {
     fn test_handle_events_no_ext() {
         let result = create_debounced_event_result(false);
         let (tx, rx) = mpsc_channel();
-        handle_events(result, None, "pwd".to_string(), tx);
+        handle_events(
+            result,
+            None,
+            None,
+            "pwd".to_string(),
+            tx,
+        );
 
         assert!(matches!(
             rx.try_recv(),
-            Ok(WatchEvent::Command(_))
+            Ok(WatchEvent::Command { .. })
+        ));
+    }
+
+    #[test]
+    fn test_handle_events_name_in_emitted_watch_event() {
+        let result = create_debounced_event_result(false);
+        let (tx, rx) = mpsc_channel();
+        handle_events(
+            result,
+            Some("test".to_string()),
+            None,
+            "pwd".to_string(),
+            tx,
+        );
+        assert!(matches!(
+                rx.try_recv(),
+                Ok(WatchEvent::Command { name: Some(ref n), ..}) if n == "test"
         ));
     }
 
@@ -395,6 +438,7 @@ mod tests {
         let (tx, rx) = mpsc_channel();
         handle_events(
             result,
+            None,
             Some(vec!["rs".to_string()]),
             "pwd".to_string(),
             tx,
@@ -402,7 +446,7 @@ mod tests {
 
         assert!(matches!(
             rx.try_recv(),
-            Ok(WatchEvent::Command(_))
+            Ok(WatchEvent::Command { .. })
         ));
     }
 
@@ -412,6 +456,7 @@ mod tests {
         let (tx, rx) = mpsc_channel();
         handle_events(
             result,
+            None,
             Some(vec!["txt".to_string()]),
             "pwd".to_string(),
             tx,
@@ -425,7 +470,13 @@ mod tests {
     fn test_hand_event_error_result() {
         let result = create_debounced_event_result(true);
         let (tx, rx) = mpsc_channel();
-        handle_events(result, None, "pwd".to_string(), tx);
+        handle_events(
+            result,
+            None,
+            None,
+            "pwd".to_string(),
+            tx,
+        );
 
         // mpsc::TryRecvError::Empty
         assert!(matches!(rx.try_recv(), Err(..)))
