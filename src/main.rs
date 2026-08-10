@@ -6,7 +6,7 @@
 //!    - `init` -> [`run_init`]
 //!    - `watch` -> [`run_watch`]
 //! 3. Execute the selected command via `run()`
-//! 4. Result `Result<(), MainError>` to the caller
+//! 4. Returns `Result<(), MainError>` to the caller
 //!
 //! The main function invokes `run()` and handles any surfaced
 //! errors.

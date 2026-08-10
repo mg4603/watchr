@@ -5,7 +5,7 @@
 //! which directories to monitor, optional file extension
 //! filters, and the command to execute on file changes.
 //!
-//! Entries are typically deserialzed from `[[watcher]]`
+//! Entries are typically deserialized from `[[watcher]]`
 //! sections in `.watchr.toml` files or created from CLI
 //! arguments.
 use std::path::PathBuf;

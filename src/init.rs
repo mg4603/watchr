@@ -65,7 +65,7 @@ debounce_ms = 500
 ///
 /// Returns [`InitError`] if:
 /// - `.watchr.toml` already exists
-/// - the directory does not exist, the path is invalid path,
+/// - the directory does not exist, the path is invalid,
 ///   or permission is denied
 ///
 /// # Examples
