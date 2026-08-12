@@ -151,7 +151,7 @@ impl Commands {
         }
     }
 
-    /// Extract the expicit config file path from `--config`
+    /// Extract the explicit config file path from `--config`
     /// flag.
     ///
     /// Returns `None` for `Init` command or if `--config`

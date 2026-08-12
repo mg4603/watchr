@@ -328,7 +328,7 @@ fn create_debouncers(
     Ok(debouncers)
 }
 
-/// Runs the main event loop, consumeing [`WatchEvent`]s.
+/// Runs the main event loop, consuming [`WatchEvent`]s.
 ///
 /// Behavior:
 /// - Executes shell commands for [`WatchEvent::Command`]
@@ -467,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hand_event_error_result() {
+    fn test_handle_event_error_result() {
         let result = create_debounced_event_result(true);
         let (tx, rx) = mpsc_channel();
         handle_events(

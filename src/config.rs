@@ -73,7 +73,7 @@ fn default_debounce_ms() -> u64 {
 /// # Arguments
 /// * `path` - Path to the `.watchr.toml` file
 ///
-/// # Errors:
+/// # Errors
 ///
 /// Returns a [`ConfigError`] if:
 /// - the file cannot be read or does not exist
