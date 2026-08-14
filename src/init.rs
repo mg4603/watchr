@@ -25,11 +25,12 @@ pub enum InitError {
     #[error(".watchr.toml already exists")]
     FileAlreadyExists,
 
-    /// Raised when file system operations fail.
+    /// Raised when file system operations fail while writing
+    /// `.watchr.toml`
     ///
     /// Common causes: permission denied, disk full, or
     /// invalid path.
-    #[error("IoError: {0}")]
+    #[error("failed to write .watchr.toml: {0}")]
     Io(#[from] std::io::Error),
 }
 
