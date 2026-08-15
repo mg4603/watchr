@@ -55,7 +55,9 @@ enum MainError {
     ///
     /// **Common causes**: permission denied, invalid path, or
     /// disk full.
-    #[error("IoError: {0}")]
+    #[error(
+        "failed to determine current working directory: {0}"
+    )]
     Io(#[from] std::io::Error),
 
     /// Raised when no watcher entries exist in config file
@@ -63,14 +65,14 @@ enum MainError {
     ///
     /// **Fix**: Ensure your config file includes at least one
     /// watcher entry, or provide an entry via CLI arguments
-    #[error("No watcher entries provided")]
+    #[error("no watcher entries provided")]
     NoWatcherEntriesProvided,
 
     /// Raised when directory to watch does not exist
     ///
     /// **Fix**: Verify the path exists and is accessible.
     #[error(
-        "Directory not found: {0} (check if path exists and is accessible)"
+        "directory not found: {0} (check if path exists and is accessible)"
     )]
     DirNotFound(PathBuf),
 
