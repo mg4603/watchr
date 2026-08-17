@@ -38,7 +38,7 @@ pub enum CliError {
     /// or vice versa.
     ///
     /// In CLI mode, both flags must be provided together.
-    #[error("Entry must include both cmd and dir")]
+    #[error("entry must include both cmd and dir")]
     MalformedEntry,
 }
 
