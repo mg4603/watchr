@@ -7,6 +7,8 @@
 //! file changes occur.
 //!
 //! See [`WatcherError`] for failure modes.
+mod shutdown;
+
 use std::path::PathBuf;
 use std::process;
 use std::sync::mpsc::{
@@ -25,6 +27,7 @@ use thiserror::Error;
 
 use crate::config::WatcherConfig;
 use crate::entry::WatcherEntry;
+use shutdown::create_shutdown_handler;
 
 /// Errors produced during watcher initialization and runtime
 /// setup.
@@ -158,34 +161,6 @@ pub fn run_watch(
     drop(tx);
 
     run_event_loop(rx);
-    Ok(())
-}
-
-/// Installs a Ctrl+C handler that triggers a graceful shutdown.
-///
-/// When SIGINT or SIGTERM is received, [`WatchEvent::Shutdown`]
-/// message is sent through the provided channel.
-///
-/// # Arguments
-///
-/// * `tx` - Channel sender used to propagate shutdown events
-///
-/// # Errors
-/// Returns [`WatcherError::SignalHandler`] if the handler cannot
-/// be registered.
-///
-/// # Examples
-///
-/// ```no_run
-/// let (tx, _) = std::sync::mpsc::channel();
-/// let ctrlc_handler = create_shutdown_handler(tx)?;
-/// ```
-fn create_shutdown_handler(
-    tx: Sender<WatchEvent>,
-) -> Result<(), WatcherError> {
-    ctrlc::try_set_handler(move || {
-        let _ = tx.send(WatchEvent::Shutdown);
-    })?;
     Ok(())
 }
 
