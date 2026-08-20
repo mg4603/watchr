@@ -8,6 +8,7 @@
 //!
 //! See [`WatcherError`] for failure modes.
 mod debounce;
+mod output;
 mod shutdown;
 
 use std::process;
@@ -19,6 +20,7 @@ use thiserror::Error;
 use crate::config::WatcherConfig;
 
 use debounce::create_debouncers;
+use output::print_output;
 use shutdown::create_shutdown_handler;
 
 /// Errors produced during watcher initialization and runtime
@@ -51,51 +53,6 @@ pub enum WatchEvent {
 
     /// Terminate the watcher loop gracefully.
     Shutdown,
-}
-
-/// Prints the output of a command execution, including status
-/// and output/error messages.
-///
-/// # Arguments
-/// * `cmd` - The command that was executed
-/// * `name` - Optional name of the watcher entry that triggered
-///   this command
-/// * `output` - Result of running the command
-fn print_output(
-    cmd: &str,
-    name: Option<&str>,
-    output: Result<process::Output, std::io::Error>,
-) {
-    if let Some(name) = name {
-        println!("[{}]", name);
-    }
-    println!("$ {}", cmd);
-
-    match output {
-        Ok(out) if out.status.success() => {
-            println!("✓ success");
-            match String::from_utf8_lossy(&out.stdout).trim() {
-                "" => println!("(no output)"),
-                out => println!("{}", out),
-            }
-        }
-        Ok(out) => {
-            match out.status.code() {
-                Some(code) => {
-                    println!("✗ failed (exit code {})", code)
-                }
-                None => println!("✗ failed (terminated)"),
-            }
-
-            match String::from_utf8_lossy(&out.stderr).trim() {
-                "" => eprintln!("(no output)"),
-                err => eprintln!("{}", err),
-            }
-        }
-        Err(e) => {
-            println!("✗ failed to spawn: {}", e);
-        }
-    }
 }
 
 /// Runs the file watching system.
