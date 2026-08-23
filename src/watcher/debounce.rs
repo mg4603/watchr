@@ -33,14 +33,19 @@ use std::time::Duration;
 /// - A directory cannot be registered for watching
 ///
 /// # Examples
-/// ```no_run
+///
+/// For internal reference only - `create_debouncers` is not
+/// part of the public API and this example cannot be compiled
+/// or run externally.
+///
+/// ```ignore
 /// use watchr::entry::WatcherEntry;
 /// use std::path::PathBuf;
 ///
 /// let (tx, _) = std::sync::mpsc::channel();
 /// let entry = WatcherEntry{
 ///     name: None,
-///     dirs: [PathBuf::from(".")]
+///     dirs: vec![PathBuf::from(".")],
 ///     ext: None,
 ///     command: "cargo test".to_string(),
 /// };
