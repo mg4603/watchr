@@ -78,20 +78,24 @@ pub enum WatchEvent {
 /// # Examples
 ///
 /// ```no_run
+/// use watchr::config::WatcherConfig;
 /// use watchr::entry::WatcherEntry;
+/// use watchr::watcher::run_watch;
+/// use std::path::PathBuf;
 ///
 /// let entry = WatcherEntry {
-///     name: "test",
+///     name: Some("test".to_string()),
 ///     dirs: vec![PathBuf::from(".")],
 ///     ext: None,
 ///     command: "cargo test".to_string(),
-/// }
+/// };
 /// let config = WatcherConfig{
 ///     debounce_ms: 500,
 ///     entries: vec![entry]
-/// }
+/// };
 ///
-/// run_watch(config)?
+/// run_watch(config)?;
+/// # Ok::<(), watchr::watcher::WatcherError>(())
 /// ```
 pub fn run_watch(
     config: WatcherConfig,

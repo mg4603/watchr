@@ -104,7 +104,7 @@ impl Commands {
     ///
     /// # Examples
     ///
-    ///   ```no_run
+    ///   ```
     ///   use watchr::cli::{Commands, CliError};
     ///   use std::path::PathBuf;
     ///
@@ -159,7 +159,7 @@ impl Commands {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use watchr::cli::Commands;
     /// use std::path::PathBuf;
     ///
@@ -189,7 +189,7 @@ impl Commands {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use watchr::cli::Commands;
     ///
     /// let cmd = Commands::Init;

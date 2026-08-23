@@ -81,7 +81,7 @@ fn default_debounce_ms() -> u64 {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
 /// use watchr::config::read_config;
 /// use std::path::Path;
 ///
