@@ -15,7 +15,11 @@ use std::sync::mpsc::Sender;
 ///
 /// # Examples
 ///
-/// ```no_run
+/// For internal reference only - `create_shutdown_handler` is not
+/// part of the public API and this example cannot be compiled or
+/// run externally
+///
+/// ```ignore
 /// let (tx, _) = std::sync::mpsc::channel();
 /// let ctrlc_handler = create_shutdown_handler(tx)?;
 /// ```

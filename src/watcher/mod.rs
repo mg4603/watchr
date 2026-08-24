@@ -130,7 +130,12 @@ pub fn run_watch(
 /// * `rx` - Channel receiver for incoming [`WatchEvent`]s
 ///
 /// # Examples
-/// ```no_run
+///
+/// For internal reference only - `run_event_loop` is not part of
+/// the public API and this example cannot be compiled or run
+/// externally.
+///
+/// ```ignore
 /// let (_tx, rx) = std::sync::mpsc::channel();
 /// run_event_loop(rx);
 /// ```
