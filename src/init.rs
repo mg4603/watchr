@@ -78,6 +78,7 @@ debounce_ms = 500
 /// let path = Path::new(".");
 /// run_init(path)?;
 /// assert!(path.join(".watchr.toml").exists());
+/// # Ok::<(), watchr::init::InitError>(())
 /// ```
 pub fn run_init(path: &Path) -> Result<(), InitError> {
     let path = path.join(".watchr.toml");

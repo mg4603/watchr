@@ -87,6 +87,7 @@ fn default_debounce_ms() -> u64 {
 ///
 /// let config = read_config(Path::new(".watchr.toml"))?;
 /// println!("Debounce: {}ms", config.debounce_ms);
+/// # Ok::<(), watchr::config::ConfigError>(())
 /// ```
 pub fn read_config(
     path: &Path,
