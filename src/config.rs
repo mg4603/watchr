@@ -81,12 +81,13 @@ fn default_debounce_ms() -> u64 {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
 /// use watchr::config::read_config;
 /// use std::path::Path;
 ///
 /// let config = read_config(Path::new(".watchr.toml"))?;
 /// println!("Debounce: {}ms", config.debounce_ms);
+/// # Ok::<(), watchr::config::ConfigError>(())
 /// ```
 pub fn read_config(
     path: &Path,

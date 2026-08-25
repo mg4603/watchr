@@ -104,20 +104,21 @@ impl Commands {
     ///
     /// # Examples
     ///
-    ///   ```
-    ///   use watchr::cli::{Commands, CliError};
-    ///   use std::path::PathBuf;
+    /// ```
+    /// use watchr::cli::{Commands, CliError};
+    /// use std::path::PathBuf;
     ///
-    ///   let cmd = Commands::Watch {
-    ///       dir: Some(PathBuf::from("src/")),
-    ///       ext: Some("rs".to_string()),
-    ///       cmd: Some("cargo test".to_string()),
-    ///       config: None,
-    ///   };
+    /// let cmd = Commands::Watch {
+    ///     dir: Some(PathBuf::from("src/")),
+    ///     ext: Some("rs".to_string()),
+    ///     cmd: Some("cargo test".to_string()),
+    ///     config: None,
+    /// };
     ///
-    ///   let entry = cmd.to_entry()?;
-    ///   assert!(entry.is_some());
-    ///   ```
+    /// let entry = cmd.to_entry()?;
+    /// assert!(entry.is_some());
+    /// # Ok::<(), CliError>(())
+    /// ```
     pub fn to_entry(
         &self,
     ) -> Result<Option<WatcherEntry>, CliError> {

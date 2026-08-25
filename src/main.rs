@@ -13,12 +13,6 @@
 //!
 //! This module contains no business logic; all functionality
 //! is delegated to command-specific modules
-mod cli;
-mod config;
-mod entry;
-mod init;
-mod resolver;
-mod watcher;
 
 use std::path::PathBuf;
 
@@ -26,11 +20,11 @@ use clap::Parser;
 use thiserror::Error;
 use tracing_subscriber::EnvFilter;
 
-use crate::cli::{Cli, CliError};
-use crate::config::{ConfigError, WatcherConfig, read_config};
-use crate::init::{InitError, run_init};
-use crate::resolver::{ResolverError, find_config_file};
-use crate::watcher::{WatcherError, run_watch};
+use watchr::cli::{Cli, CliError};
+use watchr::config::{ConfigError, WatcherConfig, read_config};
+use watchr::init::{InitError, run_init};
+use watchr::resolver::{ResolverError, find_config_file};
+use watchr::watcher::{WatcherError, run_watch};
 
 /// Errors that can occur during `watchr` run.
 #[derive(Error, Debug)]

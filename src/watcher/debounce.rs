@@ -102,7 +102,12 @@ pub(super) fn create_debouncers(
 ///
 ///
 /// # Examples
-/// ```no_run
+///
+/// For internal reference only - `handle_events` is not part of
+/// the public API and this example cannot be compiled or run
+/// externally.
+///
+/// ```ignore
 /// let (tx, _) = std::sync::mpsc::channel();
 /// handle_events(Ok(vec![]), None, None, "cargo test".into(), tx);
 /// ```
