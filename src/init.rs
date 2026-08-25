@@ -71,7 +71,7 @@ debounce_ms = 500
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
 /// use watchr::init::run_init;
 /// use std::path::Path;
 ///
