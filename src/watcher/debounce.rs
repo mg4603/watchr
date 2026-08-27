@@ -120,7 +120,16 @@ pub(super) fn handle_events(
 ) {
     match result {
         Ok(events) => {
+            tracing::debug!(
+                count = events.len(),
+                "received debounced events"
+            );
+            for event in &events {
+                tracing::debug!(paths = ?event.paths, kind = ?event.event.kind, "event detail");
+            }
             if exts.as_ref().is_none() {
+                tracing::debug!(command = %command, "sending command event");
+
                 let _ = tx.send(WatchEvent::Command {
                     cmd: command.clone(),
                     name: name.clone(),
@@ -143,6 +152,8 @@ pub(super) fn handle_events(
                     exts.as_deref(),
                 ) && exts.iter().any(|e| e == ext)
                 {
+                    tracing::debug!(command = %command, "sending command event");
+
                     let _ = tx.send(WatchEvent::Command {
                         cmd: command.clone(),
                         name: name.clone(),
