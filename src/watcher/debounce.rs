@@ -1,12 +1,13 @@
 use super::{WatchEvent, WatcherError};
 use crate::entry::WatcherEntry;
+use notify_debouncer_full::notify::event::EventKind;
 use notify_debouncer_full::notify::{
     RecommendedWatcher, RecursiveMode,
 };
 use notify_debouncer_full::{
-    DebounceEventResult, Debouncer, NoCache, new_debouncer,
+    DebounceEventResult, DebouncedEvent, Debouncer, NoCache,
+    new_debouncer,
 };
-use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
@@ -109,7 +110,13 @@ pub(super) fn create_debouncers(
 ///
 /// ```ignore
 /// let (tx, _) = std::sync::mpsc::channel();
-/// handle_events(Ok(vec![]), None, None, "cargo test".into(), tx);
+/// handle_events(
+///     Ok(vec![]),
+///     None,
+///     None,
+///     "cargo test".into(),
+///     tx
+/// );
 /// ```
 pub(super) fn handle_events(
     result: DebounceEventResult,
@@ -124,49 +131,78 @@ pub(super) fn handle_events(
                 count = events.len(),
                 "received debounced events"
             );
+
             for event in &events {
-                tracing::debug!(paths = ?event.paths, kind = ?event.event.kind, "event detail");
-            }
-            if exts.as_ref().is_none() {
-                tracing::debug!(command = %command, "sending command event");
+                tracing::debug!(
+                    paths = ?event.paths,
+                    kind = ?event.event.kind, "event detail"
+                );
 
-                let _ = tx.send(WatchEvent::Command {
-                    cmd: command.clone(),
-                    name: name.clone(),
-                });
-                return;
-            }
-
-            let paths: Vec<PathBuf> = events
-                .into_iter()
-                .flat_map(|event| event.paths.clone())
-                .collect();
-
-            for path in paths {
-                if !path.is_file() {
+                if !matches!(
+                    event.event.kind,
+                    EventKind::Modify(_)
+                        | EventKind::Create(_)
+                        | EventKind::Remove(_)
+                ) {
                     continue;
                 }
 
-                if let (Some(ext), Some(exts)) = (
-                    path.extension().and_then(|e| e.to_str()),
-                    exts.as_deref(),
-                ) && exts.iter().any(|e| e == ext)
-                {
-                    tracing::debug!(command = %command, "sending command event");
+                if check_extensions(event, exts.as_ref()) {
+                    tracing::debug!(
+                        command = %command, 
+                        "sending command event");
 
                     let _ = tx.send(WatchEvent::Command {
                         cmd: command.clone(),
                         name: name.clone(),
                     });
+
                     return;
                 }
             }
         }
+
         Err(errors) => {
             for e in errors {
-                tracing::error!(error = %e, "failed to process file watch event");
+                tracing::error!(
+                error = %e,
+                "failed to process file watch event"
+                );
             }
         }
+    }
+}
+
+/// Determines whether a debounced filesystem event should
+/// trigger a command based on file extension filtering.
+///
+/// Returns `true` if no extension filter is configured, or at
+/// least one of the event's file paths matches a provided
+/// extension.
+///
+/// # Arguments
+/// * `event` - The debounced filesystem event containing file
+///   paths
+/// * `extensions` - Optional list of file extensions to match
+///   against. If `None`, all events pass the fitler.
+///
+/// # Returns
+/// `true` if the event should trigger the command, `false`
+/// otherwise.
+fn check_extensions(
+    event: &DebouncedEvent,
+    extensions: Option<&Vec<String>>,
+) -> bool {
+    match extensions {
+        Some(extensions) => event.paths.iter().any(|path| {
+            extensions.iter().any(|ext| {
+                path.extension()
+                    .and_then(|os_str| os_str.to_str())
+                    .map(|s| s == ext)
+                    .unwrap_or(false)
+            })
+        }),
+        None => true,
     }
 }
 
@@ -181,6 +217,7 @@ mod tests {
         Event, EventKind, ModifyKind,
     };
 
+    use std::path::PathBuf;
     use std::sync::mpsc::channel as mpsc_channel;
     use std::time::Instant;
 
