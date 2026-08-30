@@ -193,17 +193,20 @@ fn check_extensions(
     event: &DebouncedEvent,
     extensions: Option<&Vec<String>>,
 ) -> bool {
-    match extensions {
-        Some(extensions) => event.paths.iter().any(|path| {
-            extensions.iter().any(|ext| {
+    event.paths.iter().any(|path| {
+        if !path.is_file() {
+            return false;
+        }
+        match extensions {
+            None => true,
+            Some(extensions) => extensions.iter().any(|ext| {
                 path.extension()
                     .and_then(|os_str| os_str.to_str())
                     .map(|s| s == ext)
                     .unwrap_or(false)
-            })
-        }),
-        None => true,
-    }
+            }),
+        }
+    })
 }
 
 #[cfg(test)]
@@ -409,5 +412,63 @@ mod tests {
             rx.try_recv(),
             Ok(WatchEvent::Command { .. })
         ));
+    }
+
+    fn test_check_extensions(
+        extensions: Option<Vec<String>>,
+        path: &str,
+        expected: bool,
+    ) -> bool {
+        let event = DebouncedEvent {
+            event: Event {
+                kind: EventKind::Modify(ModifyKind::Any),
+                paths: vec![PathBuf::from(path)],
+                attrs: Default::default(),
+            },
+            time: Instant::now(),
+        };
+        check_extensions(&event, extensions.as_ref())
+            == expected
+    }
+
+    #[test]
+    fn test_check_extensions_with_none() {
+        assert!(test_check_extensions(
+            None,
+            "src/main.rs",
+            true
+        ));
+    }
+
+    #[test]
+    fn test_check_extensions_matching() {
+        assert!(test_check_extensions(
+            Some(vec!["rs".to_string()]),
+            "src/main.rs",
+            true
+        ));
+    }
+
+    #[test]
+    fn test_check_extensions_no_matching() {
+        assert!(test_check_extensions(
+            Some(vec!["rs".to_string()]),
+            "src/main.py",
+            false
+        ));
+    }
+
+    #[test]
+    fn test_check_extensions_directory_path() {
+        assert!(test_check_extensions(
+            Some(vec!["rs".to_string()]),
+            "src",
+            false
+        ));
+    }
+
+    #[test]
+    fn test_check_extensions_directory_path_no_none() {
+        assert!(test_check_extensions(None, "src", false));
     }
 }
