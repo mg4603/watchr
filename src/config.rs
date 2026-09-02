@@ -165,4 +165,9 @@ command = "pwd"
             Err(ConfigError::Deserialize(_))
         ));
     }
+
+    #[test]
+    fn test_default_debounce_ms() {
+        assert_eq!(default_debounce_ms(), 500);
+    }
 }
