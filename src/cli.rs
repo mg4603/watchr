@@ -262,6 +262,23 @@ mod tests {
     }
 
     #[test]
+    fn test_to_entry_with_extension() {
+        let watch = Commands::Watch {
+            dir: Some(PathBuf::from("./")),
+            ext: Some("rs,toml".to_string()),
+            cmd: Some("cargo test".to_string()),
+            config: None,
+        };
+
+        let entry = watch.to_entry().unwrap().unwrap();
+        assert_eq!(entry.command, "cargo test".to_string());
+        assert_eq!(
+            entry.ext,
+            Some(vec!["rs".to_string(), "toml".to_string()])
+        );
+    }
+
+    #[test]
     fn test_to_entry_happy_path() {
         let watch = Commands::Watch {
             dir: Some(PathBuf::from("./")),
