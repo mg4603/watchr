@@ -89,7 +89,8 @@ enum MainError {
 fn main() {
     let cli = Cli::parse();
     init_tracing(cli.verbose);
-    if let Err(e) = run(cli) {
+    let mut stdout = std::io::stdout();
+    if let Err(e) = run(cli, &mut stdout) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }
@@ -104,6 +105,8 @@ fn main() {
 /// # Arguments
 ///
 /// * `cli` - Parsed command-line arguments
+/// * `writer` - Mutable writer for output (init confirmation,
+///   command results)
 ///
 /// # Errors
 ///
@@ -114,10 +117,13 @@ fn main() {
 ///   exist.
 /// - there is an error reading the config file or parsing
 ///   CLI arguments.
-fn run(cli: Cli) -> Result<(), MainError> {
+fn run(
+    cli: Cli,
+    writer: &mut dyn std::io::Write,
+) -> Result<(), MainError> {
     if cli.command.is_init() {
         run_init(&std::env::current_dir()?)?;
-        println!(".watchr.toml created");
+        writeln!(writer, ".watchr.toml created").ok();
     } else {
         let cli_entry = cli.command.to_entry()?;
         let mut config_path =
@@ -154,8 +160,7 @@ fn run(cli: Cli) -> Result<(), MainError> {
                 path.to_path_buf(),
             ));
         }
-
-        run_watch(config)?;
+        run_watch(config, writer)?;
     }
     Ok(())
 }
