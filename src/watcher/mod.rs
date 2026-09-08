@@ -67,6 +67,7 @@ pub enum WatchEvent {
 /// # Arguments
 /// * `config` - Application configuration containing watcher
 ///   entries
+/// * `writer` - Mutable writer for command output
 ///
 /// # Errors
 ///
@@ -93,12 +94,13 @@ pub enum WatchEvent {
 ///     debounce_ms: 500,
 ///     entries: vec![entry]
 /// };
-///
-/// run_watch(config)?;
+/// let mut stdout = std::io::stdout();
+/// run_watch(config, &mut stdout)?;
 /// # Ok::<(), watchr::watcher::WatcherError>(())
 /// ```
 pub fn run_watch(
     config: WatcherConfig,
+    writer: &mut dyn std::io::Write,
 ) -> Result<(), WatcherError> {
     let (tx, rx) = mpsc_channel();
 
@@ -112,8 +114,7 @@ pub fn run_watch(
 
     // drop initial sender after creating clones
     drop(tx);
-    let mut stdout = std::io::stdout();
-    run_event_loop(rx, &mut stdout);
+    run_event_loop(rx, writer);
     Ok(())
 }
 
