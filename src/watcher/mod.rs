@@ -20,7 +20,7 @@ use thiserror::Error;
 use crate::config::WatcherConfig;
 
 use debounce::create_debouncers;
-use output::print_output;
+use output::format_output;
 use shutdown::create_shutdown_handler;
 
 /// Errors produced during watcher initialization and runtime
@@ -67,6 +67,7 @@ pub enum WatchEvent {
 /// # Arguments
 /// * `config` - Application configuration containing watcher
 ///   entries
+/// * `writer` - Mutable writer for command output
 ///
 /// # Errors
 ///
@@ -93,12 +94,13 @@ pub enum WatchEvent {
 ///     debounce_ms: 500,
 ///     entries: vec![entry]
 /// };
-///
-/// run_watch(config)?;
+/// let mut stdout = std::io::stdout();
+/// run_watch(config, &mut stdout)?;
 /// # Ok::<(), watchr::watcher::WatcherError>(())
 /// ```
 pub fn run_watch(
     config: WatcherConfig,
+    writer: &mut dyn std::io::Write,
 ) -> Result<(), WatcherError> {
     let (tx, rx) = mpsc_channel();
 
@@ -112,8 +114,7 @@ pub fn run_watch(
 
     // drop initial sender after creating clones
     drop(tx);
-
-    run_event_loop(rx);
+    run_event_loop(rx, writer);
     Ok(())
 }
 
@@ -128,6 +129,9 @@ pub fn run_watch(
 ///
 /// # Arguments
 /// * `rx` - Channel receiver for incoming [`WatchEvent`]s
+/// * `writer` - Mutable writer for command output and shutdown
+///   messages
+///
 ///
 /// # Examples
 ///
@@ -137,9 +141,13 @@ pub fn run_watch(
 ///
 /// ```ignore
 /// let (_tx, rx) = std::sync::mpsc::channel();
-/// run_event_loop(rx);
+/// let mut stdout = std::io::stdout();
+/// run_event_loop(rx, &mut stdout);
 /// ```
-fn run_event_loop(rx: Receiver<WatchEvent>) {
+fn run_event_loop(
+    rx: Receiver<WatchEvent>,
+    writer: &mut dyn std::io::Write,
+) {
     loop {
         match rx.recv() {
             Ok(WatchEvent::Command { cmd, name }) => {
@@ -148,10 +156,16 @@ fn run_event_loop(rx: Receiver<WatchEvent>) {
                     .arg(&cmd)
                     .output();
 
-                print_output(&cmd, name.as_deref(), output);
+                let formatted = format_output(
+                    &cmd,
+                    name.as_deref(),
+                    output,
+                );
+                let _ = writeln!(writer, "{}", formatted);
             }
             Ok(WatchEvent::Shutdown) => {
-                println!("Shutting down gracefully...");
+                writeln!(writer, "Shutting down gracefully...")
+                    .ok();
                 break;
             }
             Err(_) => break,
