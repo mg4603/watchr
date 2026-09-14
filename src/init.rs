@@ -142,7 +142,7 @@ command = "pwd"
     }
 
     #[test]
-    #[cfg(test)]
+    #[cfg(unix)]
     fn test_permission_denied() {
         use std::os::unix::fs::PermissionsExt;
 
