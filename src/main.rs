@@ -129,19 +129,19 @@ fn run(
         let mut config_path =
             cli.command.config_path().map(|p| p.to_path_buf());
 
-        if config_path.is_none() {
+        if cli_entry.is_none() && config_path.is_none() {
             config_path =
                 find_config_file(&std::env::current_dir()?)
                     .ok();
         }
 
-        let config = if let Some(config_path) = config_path {
-            read_config(config_path.as_path())?
-        } else if let Some(entry) = cli_entry {
+        let config = if let Some(entry) = cli_entry {
             WatcherConfig {
                 debounce_ms: 500,
                 entries: vec![entry],
             }
+        } else if let Some(config_path) = config_path {
+            read_config(config_path.as_path())?
         } else {
             return Err(MainError::NoWatcherEntriesProvided);
         };
