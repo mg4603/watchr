@@ -130,8 +130,7 @@ fn run(
         run_init(&std::env::current_dir()?)?;
         writeln!(writer, ".watchr.toml created").ok();
     } else {
-        let config = resolve_config(&cli)?;
-        validate_config(&config)?;
+        let config = prepare_config(&cli)?;
         run_watch(config, writer)?;
     }
     Ok(())
@@ -238,6 +237,28 @@ fn resolve_config(
     } else {
         Err(MainError::NoConfigSource)
     }
+}
+
+/// Prepares the watcher configuration for use.
+///
+/// Resolves the configuration source and validates its
+/// content before returning it ready for use.
+///
+/// # Arguments
+/// * `cli` - Parsed command-line arguments
+///
+/// # Errors
+///
+/// Returns [`MainError`] if:
+/// - no config source is found
+/// - the config file cannot be read or parsed
+/// - the config validation fails
+fn prepare_config(
+    cli: &Cli,
+) -> Result<WatcherConfig, MainError> {
+    let config = resolve_config(cli)?;
+    validate_config(&config)?;
+    Ok(config)
 }
 
 #[cfg(test)]
