@@ -151,20 +151,7 @@ fn run(
             return Err(MainError::NoWatcherEntriesProvided);
         };
 
-        if config.entries.is_empty() {
-            return Err(MainError::NoWatcherEntriesProvided);
-        }
-
-        if let Some(path) = config
-            .entries
-            .iter()
-            .flat_map(|e| e.dirs.iter())
-            .find(|p| !p.is_dir())
-        {
-            return Err(MainError::DirNotFound(
-                path.to_path_buf(),
-            ));
-        }
+        validate_config(&config)?;
         run_watch(config, writer)?;
     }
     Ok(())
@@ -199,6 +186,36 @@ fn verbosity_to_level(verbosity: u8) -> &'static str {
         2 => "debug",
         _ => "trace",
     }
+}
+
+/// Validates the structure of a resolved watcher
+/// configuration.
+///
+/// # Arguments
+/// * `config` - Resolved watcher configuration to validate
+///
+/// # Errors
+///
+/// Returns [`MainEror`] if:
+/// - the config has no watcher entries
+/// - a configured directory does not exist or is not
+///   accessible
+fn validate_config(
+    config: &WatcherConfig,
+) -> Result<(), MainError> {
+    if config.entries.is_empty() {
+        return Err(MainError::NoWatcherEntriesProvided);
+    }
+
+    if let Some(path) = config
+        .entries
+        .iter()
+        .flat_map(|e| e.dirs.iter())
+        .find(|p| !p.is_dir())
+    {
+        return Err(MainError::DirNotFound(path.to_path_buf()));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
