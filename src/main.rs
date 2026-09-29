@@ -165,6 +165,13 @@ fn run(
     Ok(())
 }
 
+/// Initializes the tracing subscriber based on verbosity level
+/// or `RUST_LOG` environment variable.
+///
+/// `RUST_LOG` takes precedence over the verbosity flag.
+///
+/// # Arguments
+/// * `verbosity` - Verbosity level from `-v`/`-vv`/`-vvv` flag
 fn init_tracing(verbosity: u8) {
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| {
