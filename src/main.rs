@@ -130,27 +130,7 @@ fn run(
         run_init(&std::env::current_dir()?)?;
         writeln!(writer, ".watchr.toml created").ok();
     } else {
-        let cli_entry = cli.command.to_entry()?;
-        let mut config_path =
-            cli.command.config_path().map(|p| p.to_path_buf());
-
-        if cli_entry.is_none() && config_path.is_none() {
-            config_path =
-                find_config_file(&std::env::current_dir()?)
-                    .ok();
-        }
-
-        let config = if let Some(entry) = cli_entry {
-            WatcherConfig {
-                debounce_ms: 500,
-                entries: vec![entry],
-            }
-        } else if let Some(config_path) = config_path {
-            read_config(config_path.as_path())?
-        } else {
-            return Err(MainError::NoWatcherEntriesProvided);
-        };
-
+        let config = resolve_config(&cli)?;
         validate_config(&config)?;
         run_watch(config, writer)?;
     }
@@ -216,6 +196,48 @@ fn validate_config(
         return Err(MainError::DirNotFound(path.to_path_buf()));
     }
     Ok(())
+}
+
+/// Resolves the watcher configuration from CLI args or
+/// config file.
+///
+/// Resolution order:
+/// 1. CLI args (`DIR`, `--cmd`) if provided
+/// 2. Config file (`--config` flag or `.watchr.toml` found by
+///    walking up the directory tree)
+/// 3. Error if neither is provided
+///
+/// # Arguments
+/// * `cli` - Parsed command-line arguments
+///
+/// # Errors
+///
+/// Returns [`MainError`] if:
+/// -  no config source found
+/// - the config file cannot be read or parsed
+/// - CLI args are malformed (e.g. `DIR` without `--cmd`)
+fn resolve_config(
+    cli: &Cli,
+) -> Result<WatcherConfig, MainError> {
+    let cli_entry = cli.command.to_entry()?;
+    let mut config_path =
+        cli.command.config_path().map(|p| p.to_path_buf());
+
+    if cli_entry.is_none() && config_path.is_none() {
+        config_path =
+            find_config_file(&std::env::current_dir()?).ok();
+    }
+
+    if let Some(entry) = cli_entry {
+        Ok(WatcherConfig {
+            debounce_ms: 500,
+            entries: vec![entry],
+        })
+    } else if let Some(config_path) = config_path {
+        Ok(read_config(config_path.as_path())?)
+    } else {
+        Err(MainError::NoConfigSource)
+    }
 }
 
 #[cfg(test)]
