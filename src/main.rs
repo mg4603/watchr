@@ -73,6 +73,11 @@ enum MainError {
     /// Wrapper for errors from init module
     #[error("InitError: {0}")]
     InitError(#[from] InitError),
+
+    /// Raised when no config source is found (no CLI args
+    /// or config file)
+    #[error("no config source found")]
+    NoConfigSource,
 }
 
 /// Entry point for the `watchr` application.
