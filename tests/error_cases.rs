@@ -2,7 +2,7 @@ use std::process::Command;
 use tempfile::TempDir;
 
 #[test]
-fn test_no_watcher_entries_provided() {
+fn test_no_config_source_provided() {
     let tmp_dir = TempDir::new().unwrap();
 
     let binary = env!("CARGO_BIN_EXE_watchr");
@@ -14,7 +14,7 @@ fn test_no_watcher_entries_provided() {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("no watcher entries provided"));
+    assert!(stderr.contains("no config source found"));
 }
 
 #[test]
