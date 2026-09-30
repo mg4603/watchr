@@ -264,6 +264,10 @@ fn prepare_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+    use watchr::entry::WatcherEntry;
 
     #[test]
     fn test_verbosity_to_level() {
@@ -271,5 +275,82 @@ mod tests {
         assert_eq!(verbosity_to_level(1), "info");
         assert_eq!(verbosity_to_level(2), "debug");
         assert_eq!(verbosity_to_level(3), "trace");
+    }
+
+    #[test]
+    fn test_validate_config_empty_entries() {
+        let config = WatcherConfig {
+            debounce_ms: 500,
+            entries: vec![],
+        };
+
+        assert!(matches!(
+            validate_config(&config),
+            Err(MainError::NoWatcherEntriesProvided)
+        ));
+    }
+
+    #[test]
+    fn test_validate_config_dir_not_found() {
+        let config = WatcherConfig {
+            debounce_ms: 500,
+            entries: vec![WatcherEntry {
+                name: None,
+                dirs: vec![PathBuf::from("/nonexistent")],
+                ext: None,
+                command: "echo test".to_string(),
+            }],
+        };
+
+        assert!(matches!(
+            validate_config(&config),
+            Err(MainError::DirNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn test_resolve_config_from_config_file() {
+        let tmp_dir = TempDir::new().unwrap();
+        let config_file = tmp_dir.path().join(".watchr.toml");
+
+        let config = format!(
+            r#"
+[[watcher]]
+dirs = ["{}"]
+command = "echo test"
+"#,
+            tmp_dir.path().display()
+        );
+        fs::write(&config_file, config).unwrap();
+
+        let cli = Cli::parse_from([
+            "watchr",
+            "watch",
+            "--config",
+            config_file.to_str().unwrap(),
+        ]);
+
+        let result = resolve_config(&cli).unwrap();
+        assert_eq!(result.entries.len(), 1);
+        assert_eq!(result.entries[0].command, "echo test");
+        assert_eq!(result.debounce_ms, 500);
+    }
+
+    #[test]
+    fn test_resolve_config_no_source() {
+        let tmp_dir = TempDir::new().unwrap();
+
+        let original = std::env::current_dir().unwrap();
+        std::env::set_current_dir(tmp_dir.path()).unwrap();
+
+        let cli = Cli::parse_from(["watchr", "watch"]);
+        let result = resolve_config(&cli);
+
+        std::env::set_current_dir(original).unwrap();
+
+        assert!(matches!(
+            result,
+            Err(MainError::NoConfigSource)
+        ));
     }
 }
