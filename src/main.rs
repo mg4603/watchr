@@ -73,6 +73,11 @@ enum MainError {
     /// Wrapper for errors from init module
     #[error("InitError: {0}")]
     InitError(#[from] InitError),
+
+    /// Raised when no config source is found (no CLI args
+    /// or config file)
+    #[error("no config source found")]
+    NoConfigSource,
 }
 
 /// Entry point for the `watchr` application.
@@ -125,56 +130,227 @@ fn run(
         run_init(&std::env::current_dir()?)?;
         writeln!(writer, ".watchr.toml created").ok();
     } else {
-        let cli_entry = cli.command.to_entry()?;
-        let mut config_path =
-            cli.command.config_path().map(|p| p.to_path_buf());
-
-        if cli_entry.is_none() && config_path.is_none() {
-            config_path =
-                find_config_file(&std::env::current_dir()?)
-                    .ok();
-        }
-
-        let config = if let Some(entry) = cli_entry {
-            WatcherConfig {
-                debounce_ms: 500,
-                entries: vec![entry],
-            }
-        } else if let Some(config_path) = config_path {
-            read_config(config_path.as_path())?
-        } else {
-            return Err(MainError::NoWatcherEntriesProvided);
-        };
-
-        if config.entries.is_empty() {
-            return Err(MainError::NoWatcherEntriesProvided);
-        }
-
-        if let Some(path) = config
-            .entries
-            .iter()
-            .flat_map(|e| e.dirs.iter())
-            .find(|p| !p.is_dir())
-        {
-            return Err(MainError::DirNotFound(
-                path.to_path_buf(),
-            ));
-        }
+        let config = prepare_config(&cli)?;
         run_watch(config, writer)?;
     }
     Ok(())
 }
 
+/// Initializes the tracing subscriber based on verbosity level
+/// or `RUST_LOG` environment variable.
+///
+/// `RUST_LOG` takes precedence over the verbosity flag.
+///
+/// # Arguments
+/// * `verbosity` - Verbosity level from `-v`/`-vv`/`-vvv` flag
 fn init_tracing(verbosity: u8) {
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| {
-            let level = match verbosity {
-                0 => "off",
-                1 => "info",
-                2 => "debug",
-                _ => "trace",
-            };
-            EnvFilter::new(level)
+            EnvFilter::new(verbosity_to_level(verbosity))
         });
     tracing_subscriber::fmt().with_env_filter(filter).init();
+}
+
+/// Maps a verbosity count to a tracing level string.
+///
+/// # Arguments
+/// * `verbosity` - Verbosity level from `-v`/`-vv`/`-vvv` flag
+///
+/// # Returns
+/// A static string representing the tracing level
+fn verbosity_to_level(verbosity: u8) -> &'static str {
+    match verbosity {
+        0 => "off",
+        1 => "info",
+        2 => "debug",
+        _ => "trace",
+    }
+}
+
+/// Validates the structure of a resolved watcher
+/// configuration.
+///
+/// # Arguments
+/// * `config` - Resolved watcher configuration to validate
+///
+/// # Errors
+///
+/// Returns [`MainEror`] if:
+/// - the config has no watcher entries
+/// - a configured directory does not exist or is not
+///   accessible
+fn validate_config(
+    config: &WatcherConfig,
+) -> Result<(), MainError> {
+    if config.entries.is_empty() {
+        return Err(MainError::NoWatcherEntriesProvided);
+    }
+
+    if let Some(path) = config
+        .entries
+        .iter()
+        .flat_map(|e| e.dirs.iter())
+        .find(|p| !p.is_dir())
+    {
+        return Err(MainError::DirNotFound(path.to_path_buf()));
+    }
+    Ok(())
+}
+
+/// Resolves the watcher configuration from CLI args or
+/// config file.
+///
+/// Resolution order:
+/// 1. CLI args (`DIR`, `--cmd`) if provided
+/// 2. Config file (`--config` flag or `.watchr.toml` found by
+///    walking up the directory tree)
+/// 3. Error if neither is provided
+///
+/// # Arguments
+/// * `cli` - Parsed command-line arguments
+///
+/// # Errors
+///
+/// Returns [`MainError`] if:
+/// -  no config source found
+/// - the config file cannot be read or parsed
+/// - CLI args are malformed (e.g. `DIR` without `--cmd`)
+fn resolve_config(
+    cli: &Cli,
+) -> Result<WatcherConfig, MainError> {
+    let cli_entry = cli.command.to_entry()?;
+    let mut config_path =
+        cli.command.config_path().map(|p| p.to_path_buf());
+
+    if cli_entry.is_none() && config_path.is_none() {
+        config_path =
+            find_config_file(&std::env::current_dir()?).ok();
+    }
+
+    if let Some(entry) = cli_entry {
+        Ok(WatcherConfig {
+            debounce_ms: 500,
+            entries: vec![entry],
+        })
+    } else if let Some(config_path) = config_path {
+        Ok(read_config(config_path.as_path())?)
+    } else {
+        Err(MainError::NoConfigSource)
+    }
+}
+
+/// Prepares the watcher configuration for use.
+///
+/// Resolves the configuration source and validates its
+/// content before returning it ready for use.
+///
+/// # Arguments
+/// * `cli` - Parsed command-line arguments
+///
+/// # Errors
+///
+/// Returns [`MainError`] if:
+/// - no config source is found
+/// - the config file cannot be read or parsed
+/// - the config validation fails
+fn prepare_config(
+    cli: &Cli,
+) -> Result<WatcherConfig, MainError> {
+    let config = resolve_config(cli)?;
+    validate_config(&config)?;
+    Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+    use watchr::entry::WatcherEntry;
+
+    #[test]
+    fn test_verbosity_to_level() {
+        assert_eq!(verbosity_to_level(0), "off");
+        assert_eq!(verbosity_to_level(1), "info");
+        assert_eq!(verbosity_to_level(2), "debug");
+        assert_eq!(verbosity_to_level(3), "trace");
+    }
+
+    #[test]
+    fn test_validate_config_empty_entries() {
+        let config = WatcherConfig {
+            debounce_ms: 500,
+            entries: vec![],
+        };
+
+        assert!(matches!(
+            validate_config(&config),
+            Err(MainError::NoWatcherEntriesProvided)
+        ));
+    }
+
+    #[test]
+    fn test_validate_config_dir_not_found() {
+        let config = WatcherConfig {
+            debounce_ms: 500,
+            entries: vec![WatcherEntry {
+                name: None,
+                dirs: vec![PathBuf::from("/nonexistent")],
+                ext: None,
+                command: "echo test".to_string(),
+            }],
+        };
+
+        assert!(matches!(
+            validate_config(&config),
+            Err(MainError::DirNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn test_resolve_config_from_config_file() {
+        let tmp_dir = TempDir::new().unwrap();
+        let config_file = tmp_dir.path().join(".watchr.toml");
+
+        let config = format!(
+            r#"
+[[watcher]]
+dirs = ["{}"]
+command = "echo test"
+"#,
+            tmp_dir.path().display()
+        );
+        fs::write(&config_file, config).unwrap();
+
+        let cli = Cli::parse_from([
+            "watchr",
+            "watch",
+            "--config",
+            config_file.to_str().unwrap(),
+        ]);
+
+        let result = resolve_config(&cli).unwrap();
+        assert_eq!(result.entries.len(), 1);
+        assert_eq!(result.entries[0].command, "echo test");
+        assert_eq!(result.debounce_ms, 500);
+    }
+
+    #[test]
+    fn test_resolve_config_no_source() {
+        let tmp_dir = TempDir::new().unwrap();
+
+        let original = std::env::current_dir().unwrap();
+        std::env::set_current_dir(tmp_dir.path()).unwrap();
+
+        let cli = Cli::parse_from(["watchr", "watch"]);
+        let result = resolve_config(&cli);
+
+        std::env::set_current_dir(original).unwrap();
+
+        assert!(matches!(
+            result,
+            Err(MainError::NoConfigSource)
+        ));
+    }
 }

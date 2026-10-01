@@ -62,29 +62,72 @@ pub(super) fn create_debouncers(
     WatcherError,
 > {
     let mut debouncers = Vec::new();
-    for entry in entries {
+    for WatcherEntry {
+        name,
+        dirs,
+        ext,
+        command,
+    } in entries
+    {
         let tx = tx.clone();
-
         let mut debouncer = new_debouncer(
             Duration::from_millis(debounce_ms),
             None,
-            move |result: DebounceEventResult| {
-                handle_events(
-                    result,
-                    entry.name.clone(),
-                    entry.ext.clone(),
-                    entry.command.clone(),
-                    tx.clone(),
-                );
-            },
+            debounced_events_result_handler(
+                name, ext, command, tx,
+            ),
         )?;
 
-        for dir in &entry.dirs {
+        for dir in &dirs {
             debouncer.watch(dir, RecursiveMode::Recursive)?;
         }
         debouncers.push(debouncer);
     }
     Ok(debouncers)
+}
+
+/// Build the `FnMut` handler for a debouncer.
+///
+/// The returned closure forwards debounced results to
+/// [`handle_events`], passing the watcher's `name`, its `ext`
+/// filter, and `command` so only matching events emit a
+/// [`WatchEvent`] on `tx`.
+///
+/// # Arguments
+/// * `name` - Human readable name identifying the watcher (e.g.
+///   `lint`, `test`)
+/// * `ext` - Optional extension filter(s) for the entry
+/// * `command` - The command to emit on matching events
+/// * `tx` - Channel sender used to emit [`WatchEvent`]s
+///
+/// # Returns
+///
+/// A closure suitable for passing to [`new_debouncer`].
+///
+/// # Examples
+///
+/// For internal reference only - not part of the public API.
+///
+/// ```ignore
+/// let handler = debounced_events_result_handler(
+///     None, None, command, tx,
+/// );
+/// ```
+fn debounced_events_result_handler(
+    name: Option<String>,
+    ext: Option<Vec<String>>,
+    command: String,
+    tx: Sender<WatchEvent>,
+) -> impl FnMut(DebounceEventResult) {
+    move |result| {
+        handle_events(
+            result,
+            name.clone(),
+            ext.clone(),
+            command.clone(),
+            tx.clone(),
+        );
+    }
 }
 
 /// Processes debounced filesystem events and emits commands when
@@ -149,7 +192,7 @@ pub(super) fn handle_events(
 
                 if check_extensions(event, exts.as_ref()) {
                     tracing::debug!(
-                        command = %command, 
+                        command = %command,
                         "sending command event");
 
                     let _ = tx.send(WatchEvent::Command {
@@ -470,5 +513,26 @@ mod tests {
     #[test]
     fn test_check_extensions_directory_path_no_none() {
         assert!(test_check_extensions(None, "src", false));
+    }
+
+    #[test]
+    fn test_debounced_events_result_handler() {
+        let (tx, rx) = mpsc_channel();
+
+        let mut handler = debounced_events_result_handler(
+            Some("test".to_string()),
+            None,
+            "echo test".to_string(),
+            tx,
+        );
+
+        let result =
+            create_debounced_event_result(false, "modify");
+        handler(result);
+
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(WatchEvent::Command { .. })
+        ));
     }
 }
