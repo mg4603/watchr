@@ -8,12 +8,7 @@
 //! 3. Execute the selected command via `run()`
 //! 4. Returns `Result<(), MainError>` to the caller
 //!
-//! The main function invokes `run()` and handles any surfaced
-//! errors.
-//!
-//! This module contains no business logic; all functionality
-//! is delegated to command-specific modules
-
+//! All functionality is delegated to command-specific modules.
 use clap::Parser;
 use thiserror::Error;
 
@@ -27,74 +22,49 @@ use watchr::watcher::{WatcherError, run_watch};
 /// Errors that can occur during `watchr` run.
 #[derive(Error, Debug)]
 enum MainError {
-    /// Wrapper for errors from CLI module.
+    /// CLI parsing or validation failed.
     #[error("CliError: {0}")]
     CliError(#[from] CliError),
 
-    /// Wrapper for errors from config module.
+    /// Config resolution, parsing or validation failed.
     #[error("ConfigError: {0}")]
     ConfigError(#[from] ConfigError),
 
-    /// Wrapper for errors from watcher module.
+    /// Watcher initialization or shutdown-handler setup failed.
     #[error("WatcherError: {0}")]
     WatcherError(#[from] WatcherError),
 
-    /// Raised when file system operations fail.
-    ///
-    /// **Common causes**: permission denied, invalid path, or
-    /// disk full.
+    /// Filesystem I/O failed (e.g. permission denied,
+    /// invalid path).
     #[error(
         "failed to determine current working directory: {0}"
     )]
     Io(#[from] std::io::Error),
 
-    /// Wrapper for errors from init module
+    /// Config file initialization failed.
     #[error("InitError: {0}")]
     InitError(#[from] InitError),
 }
 
-/// Entry point for the `watchr` application.
-///
-/// # Errors
-/// If the application fails during execution (e.g., due to
-/// `run()` returning an error), this function prints the error
-/// to `stderr` and exits with a non-zero status code (1).
-///
-/// # Examples
-/// ```ignore
-/// $ watchr
-/// ```
 fn main() {
     let cli = Cli::parse();
     init_tracing(cli.verbose);
     let mut stdout = std::io::stdout();
     if let Err(e) = run(cli, &mut stdout) {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
         std::process::exit(1);
     }
 }
 
-/// Main orchestrator for the `watchr` application.
-///
-/// Initializes a configuration file if the `init` command is
-/// used, or prepares configuration and starts the file watcher
-/// for the `watch` command.
-///
-/// # Arguments
-///
-/// * `cli` - Parsed command-line arguments
-/// * `writer` - Mutable writer for output (init confirmation,
-///   command results)
+/// Runs the selected command: `init` creates a config file,
+/// `watch` prepares the config and starts the file watcher.
 ///
 /// # Errors
 ///
 /// Returns a [`MainError`] if:
-/// - no watcher entries are provided (either via CLI or
-///   config file).
-/// - a directory specified in the config or CLI does not
-///   exist.
-/// - there is an error reading the config file or parsing
-///   CLI arguments.
+/// - the config file cannot be read
+/// - no watcher entries are provided
+/// - a watched directory does not exist
 fn run(
     cli: Cli,
     writer: &mut dyn std::io::Write,
