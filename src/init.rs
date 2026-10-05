@@ -1,35 +1,23 @@
-//! Configuration file initialization.
+//! `init` command: generate a `.watchr.toml` template.
 //!
-//! Handles the `init` command.
-//!
-//! Generates a `.watchr.toml` template file in the target
-//! directory.
-//! The template includes comments and example watcher entries
-//! to help users get started quickly.
-//!
-//! See [`InitError`] for failure conditions.
+//! Creates a commented config file with example watcher
+//! entries. See [`InitError`] for failure conditions
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
 use thiserror::Error;
 
-/// Errors that occur during `init` command execution.
+/// Errors during `init` execution.
 #[derive(Error, Debug)]
 pub enum InitError {
-    /// Raised if `.watchr.toml` file already exists in
-    /// the target directory.
-    ///
-    /// The `init` command refuses to overwrite existing
-    /// config files to prevent accidental data loss.
+    /// `.watchr.toml` already exists; `init` refuses to
+    /// overwrite existing configs to prevent data loss.
     #[error(".watchr.toml already exists")]
     FileAlreadyExists,
 
-    /// Raised when file system operations fail while writing
-    /// `.watchr.toml`
-    ///
-    /// Common causes: permission denied, disk full, or
-    /// invalid path.
+    /// File system failure when writing `.watchr.toml`
+    /// (e.g. permission denied, disk full, invalid path).
     #[error("failed to write .watchr.toml: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -53,22 +41,13 @@ debounce_ms = 500
 # command = "cargo clippy"
 "#;
 
-/// Initialize a `.watchr.toml` in the given directory.
-///
-/// Fails if the file already exists. Does not create parent
-/// directories.
-///
-/// # Arguments
-/// * `path` - Directory where the `.watchr.toml` file will be
-///   created
+/// Create a `.watchr.toml` in `path`, failing if it already
+/// exists.
 ///
 /// # Errors
 ///
-/// Returns [`InitError`] if:
-/// - `.watchr.toml` already exists
-/// - the directory does not exist, the path is invalid,
-///   or permission is denied
-///
+/// Returns [`InitError`] if the file exists, directory is
+/// missing, path is invalid, or writing fails.
 /// # Examples
 ///
 /// ```no_run
