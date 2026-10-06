@@ -4,31 +4,21 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
-/// Errors that occur when trying to find the configuration
-/// file.
+/// Error when the config file cannot be found.
 #[derive(Debug, Error)]
 pub enum ResolverError {
-    /// Raised if configuration file not found at the specified
-    /// directory or parent directories.
+    /// No config file in the directory or its parents.
     #[error("config file not found")]
     NotFound,
 }
 
-/// Find the configuration file by checking the specified
-/// directory or walking up the directory tree.
+/// Find `.watchr.toml` in `path` or, failing that, in its
+/// parent directories, up to the filesystem root.
 ///
-/// The search starts at `path` and proceeds upward through its
-/// parent directories until the file is found or the filesystem
-/// root is reached.
+/// `path` should be a directory; a file path is treated as
+/// its containing directory.
 ///
-/// `path` is expected to be a directory. If a file path is
-/// provided, the search will start from that path directly.
-///
-/// # Errors
-///
-/// Returns a `[ResolverError]` in the following cases:
-/// - If no config file is found in the specified directory
-///   or by walking up the directory tree
+/// Returns a `[ResolverError]` if no config file is found.
 pub fn find_config_file(
     path: &Path,
 ) -> Result<PathBuf, ResolverError> {
