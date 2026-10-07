@@ -1,10 +1,7 @@
-//! File watcher orchestration.
+//! Implements `watch` command.
 //!
-//! Provides the implementation for the `watch` command.
-//!
-//! This module initializes filesystem watchers for all
-//! configured entries and dispatches commands when matching
-//! file changes occur.
+//! Initializes filesystem watchers for all configured entries
+//! and dispatches commands when matching file changes occur.
 //!
 //! See [`WatcherError`] for failure modes.
 mod debounce;
@@ -27,47 +24,35 @@ use shutdown::create_shutdown_handler;
 /// setup.
 #[derive(Error, Debug)]
 pub enum WatcherError {
-    /// Failure originating from the notify/debouncer layer.
-    ///
-    /// This includes:
-    /// - Debouncer creation failures
-    /// - Debouncer watch registration failures
+    /// Debouncer creation or watch registration failure from
+    /// the notify layer.
     #[error("notify-debouncer error: {0}")]
     Notify(#[from] notify::Error),
 
-    /// Failure when installing the Ctrl+C signal handler.
+    /// Failure installing the Ctrl+C signal handler.
     #[error("failed to create shutdown handler: {0}")]
     SignalHandler(#[from] ctrlc::Error),
 }
 
-/// Events emitted by the watcher system and consumed by the
-/// event loop.
+/// Events consumed by the event loop.
 #[derive(Debug)]
 pub enum WatchEvent {
-    /// Execute the associated command.
-    ///
-    /// `name` is the optional name of the watcher entry that
-    /// triggered this event, used to identify which watcher's
-    /// output is being shown.
+    /// Execute the associated command; `name` optionally
+    /// identifies the watcher entry that triggered this event
+    /// and is used to label its output.
     Command { cmd: String, name: Option<String> },
 
     /// Terminate the watcher loop gracefully.
     Shutdown,
 }
 
-/// Runs the file watching system.
+/// Runs the file watching system and blocks until shutdown.
 ///
-/// Initializes:
-/// - A shutdown signal handler (Ctrl+C)
-/// - Debounced filesystem watchers for all configured entries
-/// - The main event loop
-///
-/// This functions blocks until a shutdown event is received.
-///
-/// # Arguments
-/// * `config` - Application configuration containing watcher
-///   entries
-/// * `writer` - Mutable writer for command output
+/// Installs a Ctrl+C handler and debounced filesystem watchers
+/// for all configured entries, then consumes events in a loop:
+/// runs each entry's command via `sh -c` and writes its
+/// formatted output to `writer`, until Ctrl+C triggered
+/// shutdown (or channel close).
 ///
 /// # Errors
 ///
@@ -118,32 +103,6 @@ pub fn run_watch(
     Ok(())
 }
 
-/// Runs the main event loop, consuming [`WatchEvent`]s.
-///
-/// Behavior:
-/// - Executes shell commands for [`WatchEvent::Command`]
-/// - Terminates cleanly on [`WatchEvent::Shutdown`]
-/// - Exits if the channel is closed
-///
-/// Commands are executed via `sh -c`.
-///
-/// # Arguments
-/// * `rx` - Channel receiver for incoming [`WatchEvent`]s
-/// * `writer` - Mutable writer for command output and shutdown
-///   messages
-///
-///
-/// # Examples
-///
-/// For internal reference only - `run_event_loop` is not part of
-/// the public API and this example cannot be compiled or run
-/// externally.
-///
-/// ```ignore
-/// let (_tx, rx) = std::sync::mpsc::channel();
-/// let mut stdout = std::io::stdout();
-/// run_event_loop(rx, &mut stdout);
-/// ```
 fn run_event_loop(
     rx: Receiver<WatchEvent>,
     writer: &mut dyn std::io::Write,
