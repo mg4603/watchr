@@ -12,107 +12,82 @@
 use std::io;
 use std::process;
 
-/// Formats command execution output as a multi-line string.
+/// Formats command execution output as a multi-line string:
+/// watcher name (if any), command, status, and trimmed
+/// output/error messages.
 ///
-/// Returns a formatted string containing the watcher name
-/// (if provided), command, status, and output/error messages
-///
-/// # Arguments
-/// * `cmd` - The command that was executed
-/// * `name` - Optional name of the watcher entry that triggered
-///   this command
-/// * `output` - Result of running the command
-///
-/// # Returns
-/// A formatted string that can be directly written to stdout or
-/// any other output destination
+/// Returns a ready-to-print string.
 pub(super) fn format_output(
-    cmd: &str,
-    name: Option<&str>,
-    output: Result<process::Output, io::Error>,
+    executed_command: &str,
+    watcher_name: Option<&str>,
+    command_result: Result<process::Output, io::Error>,
 ) -> String {
-    let mut result = String::new();
-    push_header(&mut result, cmd, name);
+    let mut buffer = String::new();
+    push_header(&mut buffer, executed_command, watcher_name);
 
-    match output {
-        Ok(out) if out.status.success() => {
-            push_success(&mut result, &out)
+    match command_result {
+        Ok(command_output)
+            if command_output.status.success() =>
+        {
+            push_success(&mut buffer, &command_output)
         }
-        Ok(out) => push_failure(&mut result, &out),
-        Err(e) => push_spawn_error(&mut result, e),
+        Ok(command_output) => {
+            push_failure(&mut buffer, &command_output)
+        }
+        Err(e) => push_spawn_error(&mut buffer, e),
     }
-    result
+    buffer
 }
 
-/// Adds header to mutable string.
-/// (For internal reference only)
-///
-/// # Arguments
-/// * `result` - Mutable string to append header to
-/// * `cmd` - Command to be triggered by watcher entry
-/// * `name` - Name of entry
+// Adds header to buffer.
 fn push_header(
-    result: &mut String,
-    cmd: &str,
-    name: Option<&str>,
+    buffer: &mut String,
+    executed_command: &str,
+    watcher_name: Option<&str>,
 ) {
-    if let Some(name) = name {
-        result.push_str(&format!("[{}]\n", name));
+    if let Some(name) = watcher_name {
+        buffer.push_str(&format!("[{}]\n", name));
     }
-    result.push_str(&format!("$ {}\n", cmd));
+    buffer.push_str(&format!("$ {}\n", executed_command));
 }
 
-/// Adds success message to mutable string
-/// (For internal reference only)
-///
-/// # Arguments
-/// * `result` - Mutable string to append success message to
-/// * `out` - Output of the executed command
-fn push_success(result: &mut String, out: &process::Output) {
-    result.push_str("✓ success\n");
-    push_trimmed(result, &out.stdout);
+// Adds success message to buffer.
+fn push_success(
+    buffer: &mut String,
+    command_output: &process::Output,
+) {
+    buffer.push_str("✓ success\n");
+    push_trimmed(buffer, &command_output.stdout);
 }
 
-/// Adds failure message to mutable string
-/// (For internal reference only)
-///
-/// # Arguments
-/// * `result` - Mutable string to append failure message to
-/// * `out` - Output of the executed command
-fn push_failure(result: &mut String, out: &process::Output) {
-    match out.status.code() {
-        Some(code) => result.push_str(&format!(
+// Adds failure message to buffer.
+fn push_failure(
+    buffer: &mut String,
+    command_output: &process::Output,
+) {
+    match command_output.status.code() {
+        Some(code) => buffer.push_str(&format!(
             "✗ failed (exit code {})\n",
             code
         )),
-        None => result.push_str("✗ failed (terminated)\n"),
+        None => buffer.push_str("✗ failed (terminated)\n"),
     }
 
-    push_trimmed(result, &out.stderr);
+    push_trimmed(buffer, &command_output.stderr);
 }
 
-/// Adds spawn error to mutable string
-/// (For internal reference only)
-///
-/// # Arguments
-/// * `result` - Mutable string to append spawn error to
-/// * `e` - IO error that occurred while spawning child process
-fn push_spawn_error(result: &mut String, e: io::Error) {
-    result.push_str(&format!("✗ failed to spawn: {}\n", e));
+// Adds spawn error to buffer.
+fn push_spawn_error(buffer: &mut String, e: io::Error) {
+    buffer.push_str(&format!("✗ failed to spawn: {}\n", e));
 }
 
-/// Appends trimmed UTF-8 output to mutable string.
-/// (For internal reference only)
-///
-/// # Arguments
-/// * `result` - Mutable string to append trimmed output to
-/// * `bytes` - Raw bytes to trim and append
-fn push_trimmed(result: &mut String, bytes: &[u8]) {
+// Appends trimmed UTF-8 output to buffer.
+fn push_trimmed(buffer: &mut String, bytes: &[u8]) {
     match String::from_utf8_lossy(bytes).trim() {
-        "" => result.push_str("(no output)"),
-        s => result.push_str(s),
+        "" => buffer.push_str("(no output)"),
+        s => buffer.push_str(s),
     }
-    result.push('\n');
+    buffer.push('\n');
 }
 
 #[cfg(test)]
