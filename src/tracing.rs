@@ -1,14 +1,16 @@
-//! This module provides functionality to initialize tracing
-//! subscribers with configurable verbosity levels.
+//! Initializes the tracing subscriber with a configurable
+//! verbosity level.
 use tracing_subscriber::EnvFilter;
 
-/// Initializes the tracing subscriber based on verbosity level
-/// or `RUST_LOG` environment variable.
+/// Initializes the global tracing subscriber.
 ///
-/// `RUST_LOG` takes precedence over the verbosity flag.
+/// Uses `RUST_LOG` if set; otherwise derives the log level from
+/// `verbosity`.
 ///
-/// # Arguments
-/// * `verbosity` - Verbosity level from `-v`/`-vv`/`-vvv` flag
+/// # Panics
+///
+/// Panics if the global tracing subscriber has already been
+/// installed.
 pub fn init_tracing(verbosity: u8) {
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| {
@@ -17,13 +19,7 @@ pub fn init_tracing(verbosity: u8) {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 }
 
-/// Maps a verbosity count to a tracing level string.
-///
-/// # Arguments
-/// * `verbosity` - Verbosity level from `-v`/`-vv`/`-vvv` flag
-///
-/// # Returns
-/// A static string representing the tracing level
+// Maps a verbosity count to a tracing level string.
 fn verbosity_to_level(verbosity: u8) -> &'static str {
     match verbosity {
         0 => "off",

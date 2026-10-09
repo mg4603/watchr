@@ -1,9 +1,14 @@
 //! Configuration file parsing, resolution, and validation
 //!
-//! This module handles reading `.watchr.toml` files,
-//! deserializing them into `WatcherConfig` structs, resolving
-//! the configuration source (CLI args or config file), and
-//! validating the resolved config.
+//! Reads `.watchr.toml` files, deserializes them into
+//! [`WatcherConfig`] structs, resolves the configuration source
+//! (CLI args or config file), and validates the result.
+//!
+//! Resolution order:
+/// 1. CLI args (`--dir`, `--cmd`) if provided
+/// 2. Explicit config file path (`--config`) if provided
+/// 3. `.watchr.toml` discovered by walking up from `start_dir`
+/// 4. [`ConfigError::NoConfigSource`] if none of the above
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -13,51 +18,43 @@ use thiserror::Error;
 use crate::entry::WatcherEntry;
 use crate::resolver::{ResolverError, find_config_file};
 
-/// Errors that can occur while reading or parsing a configuration
-/// file.
+/// Error reading, parsing, or validating a configuration.
 #[derive(Error, Debug)]
 pub enum ConfigError {
-    /// File system error while reading the configuration file.
-    ///
-    /// Common causes: permission denied, or invalid path.
+    /// I/O error while reading the config file (e.g. permission
+    /// denied, invalid path).
     #[error("error reading config file: {0}")]
     Io(#[from] std::io::Error),
 
-    /// TOML deserialization error while parsing the configuration
-    /// file.
+    /// TOML deserialization error.
     #[error("error deserializing config file: {0}")]
     Deserialize(#[from] toml::de::Error),
 
-    /// Wrapper for errors from resolver module.
+    /// Error from resolver module.
     #[error("ResolverError: {0}")]
     ResolverError(#[from] ResolverError),
 
-    /// Raised when no watcher entries exist in config file
-    /// (deserialization) or can be resolved from CLI mode.
-    ///
-    /// **Fix**: Ensure your config file includes at least one
-    /// watcher entry, or provide an entry via CLI arguments
+    /// No watcher entries in the config file or resolvable
+    /// from CLI mode.
+    /// **Fix**: Add at least one `[[watcher]]` entry or
+    /// provide an entry via CLI arguments
     #[error("no watcher entries provided")]
     NoWatcherEntriesProvided,
 
-    /// Raised when directory to watch does not exist
-    ///
+    /// A watched directory does not exist or is not accessible
     /// **Fix**: Verify the path exists and is accessible.
     #[error(
         "directory not found: {0} (check if path exists and is accessible)"
     )]
     DirNotFound(PathBuf),
 
-    /// Raised when no config source is found (no CLI args
-    /// or config file)
+    /// No config source found (neither CLI args nor config file).
     #[error("no config source found")]
     NoConfigSource,
 }
 
-/// Configuration for watchr.
-///
-/// Deserialized from `.watchr.toml` files. Contains global
-/// settings and a list of watcher entries.
+/// Configuration for watchr, deserialized from `.watchr.toml`.
+/// Holds global settings and a list of watcher entries.
 ///
 /// # Examples
 ///
@@ -72,54 +69,24 @@ pub enum ConfigError {
 /// ```
 #[derive(Debug, Deserialize)]
 pub struct WatcherConfig {
-    /// Debounce time in milliseconds.
-    ///
-    /// Groups rapid file changes within this window.
+    /// Debounce time in milliseconds; groups rapid file changes.
     /// Defaults to 500ms.
     #[serde(default = "default_debounce_ms")]
     pub debounce_ms: u64,
 
-    /// List of watcher entries.
-    ///
-    /// Each entry defines directories to watch, optional
-    /// file extension filters and a command to execute.
+    /// Watcher entries; each defines directories to watch,
+    /// optional extension filters, and a command to execute.
     /// Corresponds to `[[watcher]]` section in TOML.
     #[serde(rename = "watcher")]
     pub entries: Vec<WatcherEntry>,
 }
 
-/// Default debounce time in milliseconds.
-///
-/// Used by serde when `debounce_ms` is not specified
-/// in the config file.
+// Default `debounce_ms` used when absent from config file.
 fn default_debounce_ms() -> u64 {
     500
 }
 
-/// Read and parse a watchr configuration file.
-///
-/// # Arguments
-/// * `path` - Path to the `.watchr.toml` file
-///
-/// # Errors
-///
-/// Returns a [`ConfigError`] if:
-/// - the file cannot be read or does not exist
-/// - the TOML is invalid or does not match the expected schema.
-///
-/// # Examples
-///
-/// For internal reference only - `read_config` is not part of
-/// the public API and this example cannot be compiled or run
-/// externally.
-/// ```ignore
-/// use watchr::config::read_config;
-/// use std::path::Path;
-///
-/// let config = read_config(Path::new(".watchr.toml"))?;
-/// println!("Debounce: {}ms", config.debounce_ms);
-/// # Ok::<(), watchr::config::ConfigError>(())
-/// ```
+// Reads and parses a watchr configuration file.
 fn read_config(
     path: &Path,
 ) -> Result<WatcherConfig, ConfigError> {
@@ -128,27 +95,6 @@ fn read_config(
     Ok(config)
 }
 
-/// Resolves the watcher configuration from CLI args or
-/// config file.
-///
-/// Resolution order:
-/// 1. CLI args (`DIR`, `--cmd`) if provided
-/// 2. Config file (`--config` flag or `.watchr.toml` found by
-///    walking up the directory tree)
-/// 3. Error if neither is provided
-///
-/// # Arguments
-/// * `entry` - Optional watcher entry resolved from CLI args
-/// * `config_path` - Optional path to config file
-/// * `start_dir` - Directory from which to start config file
-///   lookup
-///
-/// # Errors
-///
-/// Returns [`ConfigError`] if:
-/// -  no config source found
-/// - the config file cannot be read or parsed
-/// - CLI args are malformed (e.g. `DIR` without `--cmd`)
 fn resolve_config(
     entry: Option<WatcherEntry>,
     config_path: Option<PathBuf>,
@@ -174,18 +120,6 @@ fn resolve_config(
     }
 }
 
-/// Validates the structure of a resolved watcher
-/// configuration.
-///
-/// # Arguments
-/// * `config` - Resolved watcher configuration to validate
-///
-/// # Errors
-///
-/// Returns [`MainEror`] if:
-/// - the config has no watcher entries
-/// - a configured directory does not exist or is not
-///   accessible
 fn validate_config(
     config: &WatcherConfig,
 ) -> Result<(), ConfigError> {
@@ -206,23 +140,17 @@ fn validate_config(
     Ok(())
 }
 
-/// Prepares the watcher configuration for use.
-///
-/// Resolves the configuration source and validates its
-/// content before returning it ready for use.
-///
-/// # Arguments
-/// * `entry` - Optional watcher entry resolved from CLI args
-/// * `config_path` - Optional path to config file
-/// * `start_dir` - Directory from which to start config file
-///   lookup
+/// Resolves and validates the configuration, returning it
+/// ready for use.
 ///
 /// # Errors
 ///
 /// Returns [`ConfigError`] if:
-/// - no config source is found
+/// - no config source is found (neither CLI args nor config
+///   file)
 /// - the config file cannot be read or parsed
-/// - the config validation fails
+/// - the config has no watcher entries
+/// - a configured directory does not exist or is not accessible
 pub fn prepare_config(
     entry: Option<WatcherEntry>,
     config_path: Option<PathBuf>,

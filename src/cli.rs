@@ -1,8 +1,8 @@
 //! Command-line interface parsing and validation.
 //!
-//! Defines the CLI structure using `clap` and provides methods
-//! to extract configuration from command-line arguments.
-//! It supports two commands:
+//! Defines the CLI structure using [`clap`] and extracts
+//! configuration from command-line arguments. Supports two commands:
+//!
 //! - `init` for generating config files
 //! - `watch` for starting the file watcher.
 
@@ -14,19 +14,17 @@ use thiserror::Error;
 use crate::entry::WatcherEntry;
 
 /// Command-line interface for watcher.
-///
-/// Main entry point for parsing user commands and flags.
 #[derive(Parser)]
 #[command(name = "watchr")]
 #[command(
     about = "Watch a directory and execute a given command when changes are made to files in it"
 )]
 pub struct Cli {
-    /// The subcommand to execute.
+    /// The subcommand to run (`init` or `watch`)
     #[command(subcommand)]
     pub command: Commands,
 
-    /// Increase logging verbosity (-v, -vv, -vvv)
+    /// Increase logging verbosity (`-v`, `-vv`, `-vvv`)
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbose: u8,
 }
@@ -34,60 +32,39 @@ pub struct Cli {
 /// Errors that can occur during CLI argument validation.
 #[derive(Error, Debug)]
 pub enum CliError {
-    /// Raised when `--dir` is provided without `--cmd`,
-    /// or vice versa.
-    ///
-    /// In CLI mode, both flags must be provided together.
+    /// Returned when exactly one of `--dir` or `--cmd` is given.
     #[error("entry must include both cmd and dir")]
     MalformedEntry,
 }
 
 /// Available subcommands for `watchr`.
-///
-/// Supports `init` for config file generation and `watch`
-/// for starting the file watcher with optional CLI mode.
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Generate a `.watchr.toml` template file.
+    /// Generate a `.watchr.toml` template file in the current
+    /// directory, with example watcher entries
     ///
-    /// Creates a new config file in the current directory
-    /// with example watcher entries. Errors if the file
-    /// already exists.
+    /// Errors if the file already exists.
     Init,
 
     /// Start watching for file changes.
     ///
-    /// Can operate in two modes:
-    /// 1. Config mode: reads `.watchr.toml` from current or
-    ///    parent directories
-    /// 2. CLI mode: uses `--dir` and `--cmd` flags to define a
-    ///    single watcher inline
+    /// Reads from a `.watchr.toml` (either `--config` or
+    /// discovered by walking up from the cwd), or defines a
+    /// single watcher inline via `--dir` and `--cmd`.
     Watch {
-        /// Directory to watch (CLI mode only).
-        ///
-        /// Must be used together with `--cmd`. If provided
-        /// without `--cmd`, returns `CliError::MalformedEntry`.
+        /// Directory to watch (CLI mode only)
         dir: Option<PathBuf>,
 
-        /// File extensions to filter (CLI mode only).
-        ///
-        /// Comma-separated list (e.g., `"rs,toml"`). If omitted,
-        /// all file changes trigger the command.
+        /// Comma-separated file extension to filter (e.g.,
+        /// `"rs,toml"`); all files if ommitted (CLI mode only)
         #[arg(long)]
         ext: Option<String>,
 
-        /// Command to run on file changes (CLI mode only).
-        ///
-        /// Must be together with `--dir`. If provided without
-        /// `--dir`, returns `CliError::MalformedEntry`.
+        /// Command to run on file changes (CLI mode only)
         #[arg(long)]
         cmd: Option<String>,
 
-        /// Explicit path to config file.
-        ///
-        /// Overrides the default config resolution (walk up
-        /// from current directory). Can be combined with CLI
-        /// mode flags.
+        /// Explicit path to config file, overriding discovery
         #[arg(long)]
         config: Option<PathBuf>,
     },
@@ -95,12 +72,15 @@ pub enum Commands {
 
 impl Commands {
     /// Converts CLI arguments into a [`WatcherEntry`] when
-    /// `--dir` and `--cmd` are both provided.
+    /// `--dir` and `--cmd` are provided.
+    ///
+    /// Returns `Ok(None)` in config mode (neither flag provided) and
+    /// for `Init` command.
     ///
     /// # Errors
     ///
-    /// Returns [`CliError`] if:
-    /// - only one of `--dir` or `--cmd` is provided
+    /// Returns [`CliError::MalformedEntry`] if only one of `--dir`
+    /// or `--cmd` is provided
     ///
     /// # Examples
     ///
@@ -152,11 +132,10 @@ impl Commands {
         }
     }
 
-    /// Extract the explicit config file path from `--config`
-    /// flag.
+    /// Extracts the config file path from `--config` flag.
     ///
-    /// Returns `None` for `Init` command or if `--config`
-    /// flag was not provided.
+    /// Returns `None` for `Init` command or when `--config` was not
+    /// provided.
     ///
     /// # Examples
     ///
@@ -184,9 +163,7 @@ impl Commands {
         }
     }
 
-    /// Check if the command is `Init`
-    ///
-    /// Returns `true` if this is `Init`.
+    /// Returns `true` if this is the [`Commands::Init`] command.
     ///
     /// # Examples
     ///

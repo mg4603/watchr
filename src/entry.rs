@@ -1,13 +1,9 @@
-//! Watcher entry data structure.
+//! `WatcherEntry`: a single watcher configuration specifying
+//! directories to monitor, optional extension filters, and the
+//! command to run on changes.
 //!
-//! This module defines `WatcherEntry`, which represents a
-//! single watcher configuration. Each entry specifies
-//! which directories to monitor, optional file extension
-//! filters, and the command to execute on file changes.
-//!
-//! Entries are typically deserialized from `[[watcher]]`
-//! sections in `.watchr.toml` files or created from CLI
-//! arguments.
+//! Entries comes from `[[watcher]]` sections in `.watchr.toml`
+//! files or from CLI arguments.
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -27,24 +23,19 @@ use serde::Deserialize;
 /// ```
 #[derive(Debug, Deserialize)]
 pub struct WatcherEntry {
-    /// Optional descriptive name for this watcher
+    /// Optional descriptive name.
     #[allow(dead_code)]
     pub name: Option<String>,
 
-    /// Directories to watch for changes.
-    ///
-    /// Paths may be absolute or relative to the working
-    /// directory.
+    /// Directories to watch; paths can be absolute or relative
+    /// to the working directory.
     pub dirs: Vec<PathBuf>,
 
-    /// File extensions to filter (e.g., ["rs", "toml"]).
-    ///
-    /// File extensions should not include the leading dot.
-    /// If `None`, all file changes trigger the command.
+    /// Extensions to filter (e.g. `["rs", "toml"]`), without
+    /// the leading dot. `None` matches all files.
     pub ext: Option<Vec<String>>,
 
-    /// Shell command to execute when files change.
-    ///
-    /// Executed in the current working directory.
+    /// Shell command to run on changes, executed in the working
+    /// directory.
     pub command: String,
 }

@@ -1,3 +1,5 @@
+//! Creates one debounced watcher per configured entry and
+//! forwards matching filesystem events as [`WatchEvent`]s.
 use super::{WatchEvent, WatcherError};
 use crate::entry::WatcherEntry;
 use notify_debouncer_full::notify::event::EventKind;
@@ -13,19 +15,8 @@ use std::time::Duration;
 
 /// Creates and registers filesystem watchers for each entry.
 ///
-/// Each entry results in a dedicated debouncer configured with:
-/// - The specified debounce duration
-/// - A callback that filters events and emits commands
-///
-/// # Arguments
-/// * `debounce_ms` - Debounce window in milliseconds
-/// * `entries` - Watch configuration entries
-/// * `tx` - Channel sender used to emit [`WatchEvent`]s
-///
-/// # Returns
-///
-/// A collection of active debouncers. They must be kept alive
-/// for watcher to remain active.
+/// Returns the active debouncers, which must be kept alive for
+/// the watchers to remain active.
 ///
 /// # Errors
 ///
@@ -34,10 +25,6 @@ use std::time::Duration;
 /// - A directory cannot be registered for watching
 ///
 /// # Examples
-///
-/// For internal reference only - `create_debouncers` is not
-/// part of the public API and this example cannot be compiled
-/// or run externally.
 ///
 /// ```ignore
 /// use watchr::entry::WatcherEntry;
@@ -86,86 +73,35 @@ pub(super) fn create_debouncers(
     Ok(debouncers)
 }
 
-/// Build the `FnMut` handler for a debouncer.
-///
-/// The returned closure forwards debounced results to
-/// [`handle_events`], passing the watcher's `name`, its `ext`
-/// filter, and `command` so only matching events emit a
-/// [`WatchEvent`] on `tx`.
-///
-/// # Arguments
-/// * `name` - Human readable name identifying the watcher (e.g.
-///   `lint`, `test`)
-/// * `ext` - Optional extension filter(s) for the entry
-/// * `command` - The command to emit on matching events
-/// * `tx` - Channel sender used to emit [`WatchEvent`]s
-///
-/// # Returns
-///
-/// A closure suitable for passing to [`new_debouncer`].
-///
-/// # Examples
-///
-/// For internal reference only - not part of the public API.
-///
-/// ```ignore
-/// let handler = debounced_events_result_handler(
-///     None, None, command, tx,
-/// );
-/// ```
+// Returns a closure for [`new_debouncer`] that forwards
+// debounced results to [`handle_events`].
 fn debounced_events_result_handler(
-    name: Option<String>,
-    ext: Option<Vec<String>>,
-    command: String,
+    watcher_name: Option<String>,
+    extensions_to_filter: Option<Vec<String>>,
+    command_on_fs_mutation: String,
     tx: Sender<WatchEvent>,
 ) -> impl FnMut(DebounceEventResult) {
     move |result| {
         handle_events(
             result,
-            name.clone(),
-            ext.clone(),
-            command.clone(),
+            watcher_name.clone(),
+            extensions_to_filter.clone(),
+            command_on_fs_mutation.clone(),
             tx.clone(),
         );
     }
 }
 
-/// Processes debounced filesystem events and emits commands when
-/// matched.
+/// Sends the command for the first event that matches the
+/// watcher's extension filter.
 ///
-/// If no extension filter is configured, any event triggers the
-/// command. Otherwise, only file changes matching one of the
-/// provided extensions will trigger execution.
-///
-/// # Arguments
-/// * `result` - Debounced event result from the notify layer
-/// * `name` - Optional name of watcher entry
-/// * `exts` - Optional list of file extensions to filter on
-/// * `command` - Command to execute when a match occurs
-/// * `tx` - Channel sender used to emit [`WatchEvent`]s
-///
-///
-/// # Examples
-///
-/// For internal reference only - `handle_events` is not part of
-/// the public API and this example cannot be compiled or run
-/// externally.
-///
-/// ```ignore
-/// let (tx, _) = std::sync::mpsc::channel();
-/// handle_events(
-///     Ok(vec![]),
-///     None,
-///     None,
-///     "cargo test".into(),
-///     tx
-/// );
-/// ```
+/// Create, modify, and remove events are considered; if no
+/// filter is configured, any such event triggers the command.
 pub(super) fn handle_events(
     result: DebounceEventResult,
-    name: Option<String>,
-    exts: Option<Vec<String>>,
-    command: String,
+    watcher_name: Option<String>,
+    extensions_to_filter: Option<Vec<String>>,
+    command_on_fs_mutation: String,
     tx: Sender<WatchEvent>,
 ) {
     match result {
@@ -190,14 +126,17 @@ pub(super) fn handle_events(
                     continue;
                 }
 
-                if check_extensions(event, exts.as_ref()) {
+                if check_extensions(
+                    event,
+                    extensions_to_filter.as_ref(),
+                ) {
                     tracing::debug!(
-                        command = %command,
+                        command = %command_on_fs_mutation,
                         "sending command event");
 
                     let _ = tx.send(WatchEvent::Command {
-                        cmd: command.clone(),
-                        name: name.clone(),
+                        cmd: command_on_fs_mutation.clone(),
+                        name: watcher_name.clone(),
                     });
 
                     return;
@@ -216,31 +155,17 @@ pub(super) fn handle_events(
     }
 }
 
-/// Determines whether a debounced filesystem event should
-/// trigger a command based on file extension filtering.
-///
-/// Returns `true` if no extension filter is configured, or at
-/// least one of the event's file paths matches a provided
-/// extension.
-///
-/// # Arguments
-/// * `event` - The debounced filesystem event containing file
-///   paths
-/// * `extensions` - Optional list of file extensions to match
-///   against. If `None`, all events pass the fitler.
-///
-/// # Returns
-/// `true` if the event should trigger the command, `false`
-/// otherwise.
+// Returns `true` if no extension filter is configured, or one
+// of the event's file paths matches a filtered extension.
 fn check_extensions(
     event: &DebouncedEvent,
-    extensions: Option<&Vec<String>>,
+    extensions_to_filter: Option<&Vec<String>>,
 ) -> bool {
     event.paths.iter().any(|path| {
         if !path.is_file() {
             return false;
         }
-        match extensions {
+        match extensions_to_filter {
             None => true,
             Some(extensions) => extensions.iter().any(|ext| {
                 path.extension()
