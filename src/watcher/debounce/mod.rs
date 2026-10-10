@@ -121,14 +121,11 @@ pub(super) fn handle_events(
                     event,
                     extensions_to_filter.as_ref(),
                 ) {
-                    tracing::debug!(
-                        command = %command_on_fs_mutation,
-                        "sending command event");
-
-                    let _ = tx.send(WatchEvent::Command {
-                        cmd: command_on_fs_mutation.clone(),
-                        name: watcher_name.clone(),
-                    });
+                    send_command(
+                        tx,
+                        command_on_fs_mutation,
+                        watcher_name,
+                    );
 
                     return;
                 }
@@ -137,6 +134,15 @@ pub(super) fn handle_events(
 
         Err(errors) => log_errors(errors),
     }
+}
+
+fn send_command(
+    tx: Sender<WatchEvent>,
+    command: String,
+    name: Option<String>,
+) {
+    tracing::debug!(command = %command, "sending command event");
+    let _ = tx.send(WatchEvent::Command { cmd: command, name });
 }
 
 fn log_errors<E: std::fmt::Display>(

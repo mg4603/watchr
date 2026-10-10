@@ -51,6 +51,23 @@ fn create_debounced_event_result(
     Ok(vec![create_debounced_event(kind, "src/main.rs")])
 }
 
+#[traced_test]
+#[test]
+fn test_send_command() {
+    let (tx, rx) = mpsc_channel();
+    send_command(
+        tx,
+        "echo test_ran".to_string(),
+        Some("test".to_string()),
+    );
+
+    assert!(logs_contain("sending command event"));
+    assert!(matches!(
+        rx.try_recv(),
+        Ok(WatchEvent::Command { .. })
+    ))
+}
+
 #[test]
 #[traced_test]
 fn test_log_event_covers_debug_fields() {
