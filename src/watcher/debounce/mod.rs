@@ -112,11 +112,7 @@ pub(super) fn handle_events(
             );
 
             for event in &events {
-                tracing::debug!(
-                    paths = ?event.paths,
-                    kind = ?event.event.kind, "event detail"
-                );
-
+                log_event(event);
                 if !is_mutation(&event.event.kind) {
                     continue;
                 }
@@ -139,15 +135,20 @@ pub(super) fn handle_events(
             }
         }
 
-        Err(errors) => {
-            for e in errors {
-                tracing::error!(
-                error = %e,
-                "failed to process file watch event"
-                );
-            }
-        }
+        Err(errors) => log_errors(errors),
     }
+}
+
+fn log_errors<E: std::fmt::Display>(
+    errors: impl IntoIterator<Item = E>,
+) {
+    for e in errors {
+        tracing::error!(error = %e, "failed to process file watch event");
+    }
+}
+
+fn log_event(event: &DebouncedEvent) {
+    tracing::debug!(paths = ?event.paths, kind = ?event.event.kind, "event detail");
 }
 
 fn is_mutation(kind: &EventKind) -> bool {

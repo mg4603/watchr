@@ -10,6 +10,7 @@ use notify_debouncer_full::notify::event::{
 use std::path::PathBuf;
 use std::sync::mpsc::channel as mpsc_channel;
 use std::time::Instant;
+use tracing_test::traced_test;
 
 fn event_kind(kind: &str) -> EventKind {
     match kind {
@@ -17,6 +18,20 @@ fn event_kind(kind: &str) -> EventKind {
         "create" => EventKind::Create(CreateKind::Any),
         "remove" => EventKind::Remove(RemoveKind::Any),
         _ => EventKind::Modify(ModifyKind::Any), //default
+    }
+}
+
+fn create_debounced_event(
+    kind: &str,
+    path: &str,
+) -> DebouncedEvent {
+    DebouncedEvent {
+        event: Event {
+            kind: event_kind(kind),
+            paths: vec![PathBuf::from(path)],
+            attrs: Default::default(),
+        },
+        time: Instant::now(),
     }
 }
 
@@ -32,14 +47,16 @@ fn create_debounced_event_result(
             paths: vec![PathBuf::from("./")],
         }]);
     }
-    Ok(vec![DebouncedEvent {
-        event: Event {
-            kind: event_kind(kind),
-            paths: vec![PathBuf::from("src/main.rs")],
-            attrs: Default::default(),
-        },
-        time: Instant::now(),
-    }])
+
+    Ok(vec![create_debounced_event(kind, "src/main.rs")])
+}
+
+#[test]
+#[traced_test]
+fn test_log_event_covers_debug_fields() {
+    let event = create_debounced_event("access", "main.rs");
+    log_event(&event);
+    assert!(logs_contain("event detail"));
 }
 
 #[test]
@@ -147,14 +164,7 @@ fn test_check_extensions(
     path: &str,
     expected: bool,
 ) -> bool {
-    let event = DebouncedEvent {
-        event: Event {
-            kind: event_kind("modify"),
-            paths: vec![PathBuf::from(path)],
-            attrs: Default::default(),
-        },
-        time: Instant::now(),
-    };
+    let event = create_debounced_event("modify", path);
     check_extensions(&event, extensions.as_ref()) == expected
 }
 
