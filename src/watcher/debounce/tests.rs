@@ -11,6 +11,15 @@ use std::path::PathBuf;
 use std::sync::mpsc::channel as mpsc_channel;
 use std::time::Instant;
 
+fn event_kind(kind: &str) -> EventKind {
+    match kind {
+        "access" => EventKind::Access(AccessKind::Any),
+        "create" => EventKind::Create(CreateKind::Any),
+        "remove" => EventKind::Remove(RemoveKind::Any),
+        _ => EventKind::Modify(ModifyKind::Any), //default
+    }
+}
+
 fn create_debounced_event_result(
     error: bool,
     kind: &str,
@@ -23,17 +32,9 @@ fn create_debounced_event_result(
             paths: vec![PathBuf::from("./")],
         }]);
     }
-
-    let event_kind = match kind {
-        "access" => EventKind::Access(AccessKind::Any),
-        "create" => EventKind::Create(CreateKind::Any),
-        "remove" => EventKind::Remove(RemoveKind::Any),
-        _ => EventKind::Modify(ModifyKind::Any), //default
-    };
-
     Ok(vec![DebouncedEvent {
         event: Event {
-            kind: event_kind,
+            kind: event_kind(kind),
             paths: vec![PathBuf::from("src/main.rs")],
             attrs: Default::default(),
         },
@@ -115,7 +116,7 @@ fn test_handle_event_error_result() {
 }
 
 #[test]
-fn test_handle_events_filters_access_event() {
+fn test_handle_events_non_mutation_event() {
     let result = create_debounced_event_result(false, "access");
     let (tx, rx) = mpsc_channel();
     handle_events(result, None, None, "pwd".to_string(), tx);
@@ -123,7 +124,7 @@ fn test_handle_events_filters_access_event() {
 }
 
 #[test]
-fn test_handle_events_allows_modify_event() {
+fn test_handle_events_mutation_event() {
     let result = create_debounced_event_result(false, "modify");
     let (tx, rx) = mpsc_channel();
     handle_events(result, None, None, "pwd".to_string(), tx);
@@ -134,25 +135,11 @@ fn test_handle_events_allows_modify_event() {
 }
 
 #[test]
-fn test_handle_events_allows_create_event() {
-    let result = create_debounced_event_result(false, "create");
-    let (tx, rx) = mpsc_channel();
-    handle_events(result, None, None, "pwd".to_string(), tx);
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ));
-}
-
-#[test]
-fn test_handle_events_allows_remove_event() {
-    let result = create_debounced_event_result(false, "remove");
-    let (tx, rx) = mpsc_channel();
-    handle_events(result, None, None, "pwd".to_string(), tx);
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ));
+fn test_is_mutation() {
+    assert!(!is_mutation(&event_kind("access")));
+    assert!(is_mutation(&event_kind("create")));
+    assert!(is_mutation(&event_kind("remove")));
+    assert!(is_mutation(&event_kind("modify")));
 }
 
 fn test_check_extensions(
@@ -162,7 +149,7 @@ fn test_check_extensions(
 ) -> bool {
     let event = DebouncedEvent {
         event: Event {
-            kind: EventKind::Modify(ModifyKind::Any),
+            kind: event_kind("modify"),
             paths: vec![PathBuf::from(path)],
             attrs: Default::default(),
         },

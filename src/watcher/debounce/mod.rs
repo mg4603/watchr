@@ -117,12 +117,7 @@ pub(super) fn handle_events(
                     kind = ?event.event.kind, "event detail"
                 );
 
-                if !matches!(
-                    event.event.kind,
-                    EventKind::Modify(_)
-                        | EventKind::Create(_)
-                        | EventKind::Remove(_)
-                ) {
+                if !is_mutation(&event.event.kind) {
                     continue;
                 }
 
@@ -153,6 +148,15 @@ pub(super) fn handle_events(
             }
         }
     }
+}
+
+fn is_mutation(kind: &EventKind) -> bool {
+    matches!(
+        kind,
+        EventKind::Modify(_)
+            | EventKind::Create(_)
+            | EventKind::Remove(_)
+    )
 }
 
 // Returns `true` if no extension filter is configured, or one
