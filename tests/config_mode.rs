@@ -42,11 +42,8 @@ command = "echo watchr_test_ran"
         "$ echo watchr_test_ran",
         Duration::from_secs(5),
     );
-    let found_success = shared::wait_for_output(
-        &rx,
-        "✓ success",
-        Duration::from_secs(5),
-    );
+    let found_success =
+        shared::wait_for_output(&rx, "✓ success", Duration::from_secs(5));
     let found_output = shared::wait_for_output(
         &rx,
         "watchr_test_ran",
