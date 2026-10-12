@@ -3,8 +3,7 @@ use super::*;
 use notify_debouncer_full::DebouncedEvent;
 use notify_debouncer_full::notify;
 use notify_debouncer_full::notify::event::{
-    AccessKind, CreateKind, Event, EventKind, ModifyKind,
-    RemoveKind,
+    AccessKind, CreateKind, Event, EventKind, ModifyKind, RemoveKind,
 };
 
 use std::path::PathBuf;
@@ -21,10 +20,7 @@ fn event_kind(kind: &str) -> EventKind {
     }
 }
 
-fn create_debounced_event(
-    kind: &str,
-    path: &str,
-) -> DebouncedEvent {
+fn create_debounced_event(kind: &str, path: &str) -> DebouncedEvent {
     DebouncedEvent {
         event: Event {
             kind: event_kind(kind),
@@ -41,9 +37,7 @@ fn create_debounced_event_result(
 ) -> DebounceEventResult {
     if error {
         return Err(vec![notify::Error {
-            kind: notify::ErrorKind::Generic(
-                "custom".to_string(),
-            ),
+            kind: notify::ErrorKind::Generic("custom".to_string()),
             paths: vec![PathBuf::from("./")],
         }]);
     }
@@ -51,8 +45,8 @@ fn create_debounced_event_result(
     Ok(vec![create_debounced_event(kind, "src/main.rs")])
 }
 
-#[traced_test]
 #[test]
+#[traced_test]
 fn test_send_command() {
     let (tx, rx) = mpsc_channel();
     send_command(
@@ -62,10 +56,7 @@ fn test_send_command() {
     );
 
     assert!(logs_contain("sending command event"));
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ))
+    assert!(matches!(rx.try_recv(), Ok(WatchEvent::Command { .. })))
 }
 
 #[test]
@@ -77,15 +68,45 @@ fn test_log_event_covers_debug_fields() {
 }
 
 #[test]
+#[traced_test]
+fn test_has_matching_event_no_match() {
+    let events = vec![
+        create_debounced_event("access", "/tmp/file_access.txt"),
+        create_debounced_event("modify", "/tmp/readme.md"),
+    ];
+
+    let exts = vec!["rs".to_string()];
+    assert!(!has_matching_event(&events, Some(&exts)));
+
+    assert!(logs_contain("file_access"));
+    assert!(logs_contain("readme.md"));
+}
+
+#[test]
+#[traced_test]
+fn test_has_matching_event_with_short_circuit() {
+    let events = vec![
+        create_debounced_event("access", "/tmp/file_access.txt"), // logged
+        create_debounced_event("create", "/tmp/file_a.rs"),       //logged
+        create_debounced_event("remove", "/tmp/file_b.rs"), // not reached
+    ];
+    let exts = vec!["rs".to_string()];
+    assert!(has_matching_event(&events, Some(&exts)));
+
+    assert!(logs_contain("file_access"));
+    assert!(logs_contain("file_a"));
+    assert!(!logs_contain("file_b"));
+}
+
+#[traced_test]
+#[test]
 fn test_handle_events_no_ext() {
     let result = create_debounced_event_result(false, "modify");
     let (tx, rx) = mpsc_channel();
     handle_events(result, None, None, "pwd".to_string(), tx);
 
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ));
+    assert!(logs_contain("received debounced events count=1"));
+    assert!(matches!(rx.try_recv(), Ok(WatchEvent::Command { .. })));
 }
 
 #[test]
@@ -117,10 +138,7 @@ fn test_handle_event_matching_ext() {
         tx,
     );
 
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ));
+    assert!(matches!(rx.try_recv(), Ok(WatchEvent::Command { .. })));
 }
 
 #[test]
@@ -162,10 +180,7 @@ fn test_handle_events_mutation_event() {
     let result = create_debounced_event_result(false, "modify");
     let (tx, rx) = mpsc_channel();
     handle_events(result, None, None, "pwd".to_string(), tx);
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ));
+    assert!(matches!(rx.try_recv(), Ok(WatchEvent::Command { .. })));
 }
 
 #[test]
@@ -236,8 +251,5 @@ fn test_debounced_events_result_handler() {
     let result = create_debounced_event_result(false, "modify");
     handler(result);
 
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ))
+    assert!(matches!(rx.try_recv(), Ok(WatchEvent::Command { .. })))
 }
