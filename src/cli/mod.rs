@@ -99,16 +99,12 @@ impl Commands {
     /// assert!(entry.is_some());
     /// # Ok::<(), CliError>(())
     /// ```
-    pub fn to_entry(
-        &self,
-    ) -> Result<Option<WatcherEntry>, CliError> {
+    pub fn to_entry(&self) -> Result<Option<WatcherEntry>, CliError> {
         match self {
             Commands::Init => Ok(None),
             Commands::Watch { dir, ext, cmd, .. } => {
                 let ext = ext.as_ref().map(|ext| {
-                    ext.split(',')
-                        .map(|x| x.to_string())
-                        .collect()
+                    ext.split(',').map(|x| x.to_string()).collect()
                 });
 
                 let dir = dir.as_ref();

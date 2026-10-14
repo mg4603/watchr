@@ -12,10 +12,9 @@ use tracing_subscriber::EnvFilter;
 /// Panics if the global tracing subscriber has already been
 /// installed.
 pub fn init_tracing(verbosity: u8) {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| {
-            EnvFilter::new(verbosity_to_level(verbosity))
-        });
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        EnvFilter::new(verbosity_to_level(verbosity))
+    });
     tracing_subscriber::fmt().with_env_filter(filter).init();
 }
 

@@ -13,3 +13,6 @@ toml = "1.1.2"
 thiserror = "2.0.18"
 tempfile = "3.27.0"
 ctrlc = "3.5.2"
+
+[dev-dependencies]
+tracing-test = { version = "0.2", features = ["no-env-filter"] }

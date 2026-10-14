@@ -87,9 +87,7 @@ fn default_debounce_ms() -> u64 {
 }
 
 // Reads and parses a watchr configuration file.
-fn read_config(
-    path: &Path,
-) -> Result<WatcherConfig, ConfigError> {
+fn read_config(path: &Path) -> Result<WatcherConfig, ConfigError> {
     let config_str = fs::read_to_string(path)?;
     let config: WatcherConfig = toml::from_str(&config_str)?;
     Ok(config)
@@ -102,8 +100,7 @@ fn resolve_config(
 ) -> Result<WatcherConfig, ConfigError> {
     let mut resolved_config_path = config_path;
     if entry.is_none() && resolved_config_path.is_none() {
-        resolved_config_path =
-            find_config_file(&start_dir).ok();
+        resolved_config_path = find_config_file(&start_dir).ok();
     }
 
     if let Some(entry) = entry {
@@ -111,18 +108,14 @@ fn resolve_config(
             debounce_ms: default_debounce_ms(),
             entries: vec![entry],
         })
-    } else if let Some(resolved_config_path) =
-        resolved_config_path
-    {
+    } else if let Some(resolved_config_path) = resolved_config_path {
         Ok(read_config(resolved_config_path.as_path())?)
     } else {
         Err(ConfigError::NoConfigSource)
     }
 }
 
-fn validate_config(
-    config: &WatcherConfig,
-) -> Result<(), ConfigError> {
+fn validate_config(config: &WatcherConfig) -> Result<(), ConfigError> {
     if config.entries.is_empty() {
         return Err(ConfigError::NoWatcherEntriesProvided);
     }
@@ -133,9 +126,7 @@ fn validate_config(
         .flat_map(|e| e.dirs.iter())
         .find(|p| !p.is_dir())
     {
-        return Err(ConfigError::DirNotFound(
-            path.to_path_buf(),
-        ));
+        return Err(ConfigError::DirNotFound(path.to_path_buf()));
     }
     Ok(())
 }

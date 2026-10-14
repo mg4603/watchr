@@ -3,9 +3,7 @@
 use super::{WatchEvent, WatcherError};
 use crate::entry::WatcherEntry;
 use notify_debouncer_full::notify::event::EventKind;
-use notify_debouncer_full::notify::{
-    RecommendedWatcher, RecursiveMode,
-};
+use notify_debouncer_full::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
     DebounceEventResult, DebouncedEvent, Debouncer, NoCache,
     new_debouncer,
@@ -44,10 +42,7 @@ pub(super) fn create_debouncers(
     debounce_ms: u64,
     entries: Vec<WatcherEntry>,
     tx: Sender<WatchEvent>,
-) -> Result<
-    Vec<Debouncer<RecommendedWatcher, NoCache>>,
-    WatcherError,
-> {
+) -> Result<Vec<Debouncer<RecommendedWatcher, NoCache>>, WatcherError> {
     let mut debouncers = Vec::new();
     for WatcherEntry {
         name,
@@ -60,9 +55,7 @@ pub(super) fn create_debouncers(
         let mut debouncer = new_debouncer(
             Duration::from_millis(debounce_ms),
             None,
-            debounced_events_result_handler(
-                name, ext, command, tx,
-            ),
+            debounced_events_result_handler(name, ext, command, tx),
         )?;
 
         for dir in &dirs {
@@ -111,48 +104,55 @@ pub(super) fn handle_events(
                 "received debounced events"
             );
 
-            for event in &events {
-                tracing::debug!(
-                    paths = ?event.paths,
-                    kind = ?event.event.kind, "event detail"
-                );
-
-                if !matches!(
-                    event.event.kind,
-                    EventKind::Modify(_)
-                        | EventKind::Create(_)
-                        | EventKind::Remove(_)
-                ) {
-                    continue;
-                }
-
-                if check_extensions(
-                    event,
-                    extensions_to_filter.as_ref(),
-                ) {
-                    tracing::debug!(
-                        command = %command_on_fs_mutation,
-                        "sending command event");
-
-                    let _ = tx.send(WatchEvent::Command {
-                        cmd: command_on_fs_mutation.clone(),
-                        name: watcher_name.clone(),
-                    });
-
-                    return;
-                }
+            if has_matching_event(&events, extensions_to_filter.as_ref())
+            {
+                send_command(tx, command_on_fs_mutation, watcher_name);
             }
         }
 
-        Err(errors) => {
-            for e in errors {
-                tracing::error!(
-                error = %e,
-                "failed to process file watch event"
-                );
-            }
-        }
+        Err(errors) => log_errors(errors),
     }
+}
+
+fn has_matching_event(
+    events: &[DebouncedEvent],
+    exts: Option<&Vec<String>>,
+) -> bool {
+    events
+        .iter()
+        .inspect(|event| log_event(event))
+        .any(|event| {
+            is_mutation(&event.event.kind)
+                && check_extensions(event, exts)
+        })
+}
+
+fn send_command(
+    tx: Sender<WatchEvent>,
+    command: String,
+    name: Option<String>,
+) {
+    tracing::debug!(command = %command, "sending command event");
+    let _ = tx.send(WatchEvent::Command { cmd: command, name });
+}
+
+fn log_errors<E: std::fmt::Display>(errors: impl IntoIterator<Item = E>) {
+    for e in errors {
+        tracing::error!(error = %e, "failed to process file watch event");
+    }
+}
+
+fn log_event(event: &DebouncedEvent) {
+    tracing::debug!(paths = ?event.paths, kind = ?event.event.kind, "event detail");
+}
+
+fn is_mutation(kind: &EventKind) -> bool {
+    matches!(
+        kind,
+        EventKind::Modify(_)
+            | EventKind::Create(_)
+            | EventKind::Remove(_)
+    )
 }
 
 // Returns `true` if no extension filter is configured, or one

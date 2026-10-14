@@ -32,11 +32,8 @@ fn test_cli_mode_executes_command_on_file_change() {
         "$ echo watchr_test_ran",
         Duration::from_secs(5),
     );
-    let found_success = shared::wait_for_output(
-        &rx,
-        "✓ success",
-        Duration::from_secs(5),
-    );
+    let found_success =
+        shared::wait_for_output(&rx, "✓ success", Duration::from_secs(5));
     let found_output = shared::wait_for_output(
         &rx,
         "watchr_test_ran",

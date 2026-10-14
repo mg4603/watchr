@@ -10,6 +10,30 @@ use notify_debouncer_full::notify::event::{
 use std::path::PathBuf;
 use std::sync::mpsc::channel as mpsc_channel;
 use std::time::Instant;
+use tracing_test::traced_test;
+
+fn event_kind(kind: &str) -> EventKind {
+    match kind {
+        "access" => EventKind::Access(AccessKind::Any),
+        "create" => EventKind::Create(CreateKind::Any),
+        "remove" => EventKind::Remove(RemoveKind::Any),
+        _ => EventKind::Modify(ModifyKind::Any), //default
+    }
+}
+
+fn create_debounced_event(
+    kind: &str,
+    path: &str,
+) -> DebouncedEvent {
+    DebouncedEvent {
+        event: Event {
+            kind: event_kind(kind),
+            paths: vec![PathBuf::from(path)],
+            attrs: Default::default(),
+        },
+        time: Instant::now(),
+    }
+}
 
 fn create_debounced_event_result(
     error: bool,
@@ -24,21 +48,32 @@ fn create_debounced_event_result(
         }]);
     }
 
-    let event_kind = match kind {
-        "access" => EventKind::Access(AccessKind::Any),
-        "create" => EventKind::Create(CreateKind::Any),
-        "remove" => EventKind::Remove(RemoveKind::Any),
-        _ => EventKind::Modify(ModifyKind::Any), //default
-    };
+    Ok(vec![create_debounced_event(kind, "src/main.rs")])
+}
 
-    Ok(vec![DebouncedEvent {
-        event: Event {
-            kind: event_kind,
-            paths: vec![PathBuf::from("src/main.rs")],
-            attrs: Default::default(),
-        },
-        time: Instant::now(),
-    }])
+#[traced_test]
+#[test]
+fn test_send_command() {
+    let (tx, rx) = mpsc_channel();
+    send_command(
+        tx,
+        "echo test_ran".to_string(),
+        Some("test".to_string()),
+    );
+
+    assert!(logs_contain("sending command event"));
+    assert!(matches!(
+        rx.try_recv(),
+        Ok(WatchEvent::Command { .. })
+    ))
+}
+
+#[test]
+#[traced_test]
+fn test_log_event_covers_debug_fields() {
+    let event = create_debounced_event("access", "main.rs");
+    log_event(&event);
+    assert!(logs_contain("event detail"));
 }
 
 #[test]
@@ -115,7 +150,7 @@ fn test_handle_event_error_result() {
 }
 
 #[test]
-fn test_handle_events_filters_access_event() {
+fn test_handle_events_non_mutation_event() {
     let result = create_debounced_event_result(false, "access");
     let (tx, rx) = mpsc_channel();
     handle_events(result, None, None, "pwd".to_string(), tx);
@@ -123,7 +158,7 @@ fn test_handle_events_filters_access_event() {
 }
 
 #[test]
-fn test_handle_events_allows_modify_event() {
+fn test_handle_events_mutation_event() {
     let result = create_debounced_event_result(false, "modify");
     let (tx, rx) = mpsc_channel();
     handle_events(result, None, None, "pwd".to_string(), tx);
@@ -134,25 +169,11 @@ fn test_handle_events_allows_modify_event() {
 }
 
 #[test]
-fn test_handle_events_allows_create_event() {
-    let result = create_debounced_event_result(false, "create");
-    let (tx, rx) = mpsc_channel();
-    handle_events(result, None, None, "pwd".to_string(), tx);
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ));
-}
-
-#[test]
-fn test_handle_events_allows_remove_event() {
-    let result = create_debounced_event_result(false, "remove");
-    let (tx, rx) = mpsc_channel();
-    handle_events(result, None, None, "pwd".to_string(), tx);
-    assert!(matches!(
-        rx.try_recv(),
-        Ok(WatchEvent::Command { .. })
-    ));
+fn test_is_mutation() {
+    assert!(!is_mutation(&event_kind("access")));
+    assert!(is_mutation(&event_kind("create")));
+    assert!(is_mutation(&event_kind("remove")));
+    assert!(is_mutation(&event_kind("modify")));
 }
 
 fn test_check_extensions(
@@ -160,14 +181,7 @@ fn test_check_extensions(
     path: &str,
     expected: bool,
 ) -> bool {
-    let event = DebouncedEvent {
-        event: Event {
-            kind: EventKind::Modify(ModifyKind::Any),
-            paths: vec![PathBuf::from(path)],
-            attrs: Default::default(),
-        },
-        time: Instant::now(),
-    };
+    let event = create_debounced_event("modify", path);
     check_extensions(&event, extensions.as_ref()) == expected
 }
 

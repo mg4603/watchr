@@ -115,16 +115,12 @@ fn run_event_loop(
                     .arg(&cmd)
                     .output();
 
-                let formatted = format_output(
-                    &cmd,
-                    name.as_deref(),
-                    output,
-                );
+                let formatted =
+                    format_output(&cmd, name.as_deref(), output);
                 let _ = writeln!(writer, "{}", formatted);
             }
             Ok(WatchEvent::Shutdown) => {
-                writeln!(writer, "Shutting down gracefully...")
-                    .ok();
+                writeln!(writer, "Shutting down gracefully...").ok();
                 break;
             }
             Err(_) => break,

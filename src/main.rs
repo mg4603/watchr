@@ -36,9 +36,7 @@ enum MainError {
 
     /// Filesystem I/O failed (e.g. permission denied,
     /// invalid path).
-    #[error(
-        "failed to determine current working directory: {0}"
-    )]
+    #[error("failed to determine current working directory: {0}")]
     Io(#[from] std::io::Error),
 
     /// Config file initialization failed.
