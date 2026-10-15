@@ -6,9 +6,11 @@ use notify_debouncer_full::notify::event::{
     AccessKind, CreateKind, Event, EventKind, ModifyKind, RemoveKind,
 };
 
+use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::channel as mpsc_channel;
 use std::time::Instant;
+use tempfile::TempDir;
 use tracing_test::traced_test;
 
 fn event_kind(kind: &str) -> EventKind {
@@ -70,9 +72,15 @@ fn test_log_event_covers_debug_fields() {
 #[test]
 #[traced_test]
 fn test_has_matching_event_no_match() {
+    let tmp_dir = TempDir::new().unwrap();
+    let file_1 = tmp_dir.path().join("file_access.txt");
+    fs::write(&file_1, "test").unwrap();
+    let file_2 = tmp_dir.path().join("readme.md");
+    fs::write(&file_2, "test").unwrap();
+
     let events = vec![
-        create_debounced_event("access", "/tmp/file_access.txt"),
-        create_debounced_event("modify", "/tmp/readme.md"),
+        create_debounced_event("access", &file_1.display().to_string()),
+        create_debounced_event("modify", &file_2.display().to_string()),
     ];
 
     let exts = vec!["rs".to_string()];
@@ -85,10 +93,18 @@ fn test_has_matching_event_no_match() {
 #[test]
 #[traced_test]
 fn test_has_matching_event_with_short_circuit() {
+    let tmp_dir = TempDir::new().unwrap();
+    let file_1 = tmp_dir.path().join("file_access.txt");
+    fs::write(&file_1, "test").unwrap();
+    let file_2 = tmp_dir.path().join("file_a.rs");
+    fs::write(&file_2, "test").unwrap();
+    let file_3 = tmp_dir.path().join("file_b.rs");
+    fs::write(&file_3, "test").unwrap();
+
     let events = vec![
-        create_debounced_event("access", "/tmp/file_access.txt"), // logged
-        create_debounced_event("create", "/tmp/file_a.rs"),       //logged
-        create_debounced_event("remove", "/tmp/file_b.rs"), // not reached
+        create_debounced_event("access", &file_1.display().to_string()),
+        create_debounced_event("create", &file_2.display().to_string()),
+        create_debounced_event("remove", &file_3.display().to_string()),
     ];
     let exts = vec!["rs".to_string()];
     assert!(has_matching_event(&events, Some(&exts)));
@@ -191,50 +207,12 @@ fn test_is_mutation() {
     assert!(is_mutation(&event_kind("modify")));
 }
 
-fn test_check_extensions(
-    extensions: Option<Vec<String>>,
-    path: &str,
-    expected: bool,
-) -> bool {
-    let event = create_debounced_event("modify", path);
-    check_extensions(&event, extensions.as_ref()) == expected
-}
-
 #[test]
-fn test_check_extensions_with_none() {
-    assert!(test_check_extensions(None, "src/main.rs", true));
-}
-
-#[test]
-fn test_check_extensions_matching() {
-    assert!(test_check_extensions(
-        Some(vec!["rs".to_string()]),
-        "src/main.rs",
-        true
-    ));
-}
-
-#[test]
-fn test_check_extensions_no_matching() {
-    assert!(test_check_extensions(
-        Some(vec!["rs".to_string()]),
-        "src/main.py",
-        false
-    ));
-}
-
-#[test]
-fn test_check_extensions_directory_path() {
-    assert!(test_check_extensions(
-        Some(vec!["rs".to_string()]),
-        "src",
-        false
-    ));
-}
-
-#[test]
-fn test_check_extensions_directory_path_no_none() {
-    assert!(test_check_extensions(None, "src", false));
+fn test_check_extensions() {
+    let exts: Vec<String> = vec!["rs".to_string()];
+    assert!(check_extensions(Path::new("src/main.rs"), None));
+    assert!(check_extensions(Path::new("src/main.rs"), Some(&exts)));
+    assert!(!check_extensions(Path::new("src/main.py"), Some(&exts)));
 }
 
 #[test]

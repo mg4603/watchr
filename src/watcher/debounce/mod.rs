@@ -8,6 +8,7 @@ use notify_debouncer_full::{
     DebounceEventResult, DebouncedEvent, Debouncer, NoCache,
     new_debouncer,
 };
+use std::path::Path;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
@@ -104,8 +105,10 @@ pub(super) fn handle_events(
                 "received debounced events"
             );
 
-            if has_matching_event(&events, extensions_to_filter.as_ref())
-            {
+            if has_matching_event(
+                &events,
+                extensions_to_filter.as_deref(),
+            ) {
                 send_command(tx, command_on_fs_mutation, watcher_name);
             }
         }
@@ -116,14 +119,16 @@ pub(super) fn handle_events(
 
 fn has_matching_event(
     events: &[DebouncedEvent],
-    exts: Option<&Vec<String>>,
+    exts: Option<&[String]>,
 ) -> bool {
     events
         .iter()
         .inspect(|event| log_event(event))
         .any(|event| {
             is_mutation(&event.event.kind)
-                && check_extensions(event, exts)
+                && event.paths.iter().any(|path| {
+                    path.is_file() && check_extensions(path, exts)
+                })
         })
 }
 
@@ -158,23 +163,18 @@ fn is_mutation(kind: &EventKind) -> bool {
 // Returns `true` if no extension filter is configured, or one
 // of the event's file paths matches a filtered extension.
 fn check_extensions(
-    event: &DebouncedEvent,
-    extensions_to_filter: Option<&Vec<String>>,
+    path: &Path,
+    extensions_to_filter: Option<&[String]>,
 ) -> bool {
-    event.paths.iter().any(|path| {
-        if !path.is_file() {
-            return false;
-        }
-        match extensions_to_filter {
-            None => true,
-            Some(extensions) => extensions.iter().any(|ext| {
-                path.extension()
-                    .and_then(|os_str| os_str.to_str())
-                    .map(|s| s == ext)
-                    .unwrap_or(false)
-            }),
-        }
-    })
+    match extensions_to_filter {
+        None => true,
+        Some(extensions) => extensions.iter().any(|ext| {
+            path.extension()
+                .and_then(|os_str| os_str.to_str())
+                .map(|s| s == ext)
+                .unwrap_or(false)
+        }),
+    }
 }
 
 #[cfg(test)]
