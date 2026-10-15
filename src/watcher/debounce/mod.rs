@@ -117,6 +117,10 @@ pub(super) fn handle_events(
     }
 }
 
+fn is_relevant_path(path: &Path, exts: Option<&[String]>) -> bool {
+    path.is_file() && check_extensions(path, exts)
+}
+
 fn has_matching_event(
     events: &[DebouncedEvent],
     exts: Option<&[String]>,
@@ -126,9 +130,10 @@ fn has_matching_event(
         .inspect(|event| log_event(event))
         .any(|event| {
             is_mutation(&event.event.kind)
-                && event.paths.iter().any(|path| {
-                    path.is_file() && check_extensions(path, exts)
-                })
+                && event
+                    .paths
+                    .iter()
+                    .any(|path| is_relevant_path(path, exts))
         })
 }
 
