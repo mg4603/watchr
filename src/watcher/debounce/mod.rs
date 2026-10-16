@@ -8,10 +8,11 @@ use notify_debouncer_full::{
     DebounceEventResult, DebouncedEvent, Debouncer, NoCache,
     new_debouncer,
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
+type WatchEventDebouncer = Debouncer<RecommendedWatcher, NoCache>;
 /// Creates and registers filesystem watchers for each entry.
 ///
 /// Returns the active debouncers, which must be kept alive for
@@ -43,22 +44,40 @@ pub(super) fn create_debouncers(
     debounce_ms: u64,
     entries: Vec<WatcherEntry>,
     tx: Sender<WatchEvent>,
-) -> Result<Vec<Debouncer<RecommendedWatcher, NoCache>>, WatcherError> {
-    let mut debouncers = Vec::new();
-    for WatcherEntry { name, dirs, ext, command } in entries {
-        let tx = tx.clone();
-        let mut debouncer = new_debouncer(
-            Duration::from_millis(debounce_ms),
-            None,
-            debounced_events_result_handler(name, ext, command, tx),
-        )?;
+) -> Result<Vec<WatchEventDebouncer>, WatcherError> {
+    entries
+        .into_iter()
+        .map(|entry| {
+            create_debouncer_for_entry(debounce_ms, entry, tx.clone())
+        })
+        .collect()
+}
 
-        for dir in &dirs {
-            debouncer.watch(dir, RecursiveMode::Recursive)?;
-        }
-        debouncers.push(debouncer);
+fn create_debouncer_for_entry(
+    debounce_ms: u64,
+    entry: WatcherEntry,
+    tx: Sender<WatchEvent>,
+) -> Result<WatchEventDebouncer, WatcherError> {
+    let WatcherEntry { name, dirs, ext, command } = entry;
+
+    let mut debouncer = new_debouncer(
+        Duration::from_millis(debounce_ms),
+        None,
+        debounced_events_result_handler(name, ext, command, tx),
+    )?;
+
+    watch_dirs(&mut debouncer, &dirs)?;
+    Ok(debouncer)
+}
+
+fn watch_dirs(
+    debouncer: &mut WatchEventDebouncer,
+    dirs: &[PathBuf],
+) -> Result<(), WatcherError> {
+    for dir in dirs {
+        debouncer.watch(dir, RecursiveMode::Recursive)?;
     }
-    Ok(debouncers)
+    Ok(())
 }
 
 // Returns a closure for [`new_debouncer`] that forwards
