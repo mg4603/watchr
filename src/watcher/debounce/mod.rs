@@ -45,13 +45,7 @@ pub(super) fn create_debouncers(
     tx: Sender<WatchEvent>,
 ) -> Result<Vec<Debouncer<RecommendedWatcher, NoCache>>, WatcherError> {
     let mut debouncers = Vec::new();
-    for WatcherEntry {
-        name,
-        dirs,
-        ext,
-        command,
-    } in entries
-    {
+    for WatcherEntry { name, dirs, ext, command } in entries {
         let tx = tx.clone();
         let mut debouncer = new_debouncer(
             Duration::from_millis(debounce_ms),
@@ -125,16 +119,10 @@ fn has_matching_event(
     events: &[DebouncedEvent],
     exts: Option<&[String]>,
 ) -> bool {
-    events
-        .iter()
-        .inspect(|event| log_event(event))
-        .any(|event| {
-            is_mutation(&event.event.kind)
-                && event
-                    .paths
-                    .iter()
-                    .any(|path| is_relevant_path(path, exts))
-        })
+    events.iter().inspect(|event| log_event(event)).any(|event| {
+        is_mutation(&event.event.kind)
+            && event.paths.iter().any(|path| is_relevant_path(path, exts))
+    })
 }
 
 fn send_command(

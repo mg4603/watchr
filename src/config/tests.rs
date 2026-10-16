@@ -6,8 +6,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 fn create_config_file(path: &Path, malformed: bool) {
-    let injection =
-        (if malformed { "[" } else { "" }).to_string();
+    let injection = (if malformed { "[" } else { "" }).to_string();
 
     let config = format!(
         r####"{}debounce_ms = 500
@@ -74,10 +73,7 @@ fn test_default_debounce_ms() {
 
 #[test]
 fn test_validate_config_empty_entries() {
-    let config = WatcherConfig {
-        debounce_ms: 500,
-        entries: vec![],
-    };
+    let config = WatcherConfig { debounce_ms: 500, entries: vec![] };
 
     assert!(matches!(
         validate_config(&config),
@@ -136,11 +132,7 @@ fn test_resolve_config_no_source() {
     let original = std::env::current_dir().unwrap();
     std::env::set_current_dir(tmp_dir.path()).unwrap();
 
-    let result = resolve_config(
-        None,
-        None,
-        tmp_dir.path().to_path_buf(),
-    );
+    let result = resolve_config(None, None, tmp_dir.path().to_path_buf());
 
     std::env::set_current_dir(original).unwrap();
 

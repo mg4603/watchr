@@ -12,8 +12,7 @@ fn test_format_output_success_output_name() {
         stderr: Vec::new(),
     });
 
-    let formatted =
-        format_output("cargo test", Some("tests"), output);
+    let formatted = format_output("cargo test", Some("tests"), output);
 
     assert!(formatted.contains("[tests]"));
     assert!(formatted.contains("$ cargo test"));
@@ -81,17 +80,12 @@ fn test_format_output_failure_terminated() {
 
 #[test]
 fn test_format_output_failure_no_spawn() {
-    let output = Err(io::Error::new(
-        io::ErrorKind::NotFound,
-        "command not found",
-    ));
+    let output =
+        Err(io::Error::new(io::ErrorKind::NotFound, "command not found"));
 
     let formatted = format_output("nonexistent", None, output);
 
     println!("{}", formatted);
     assert!(formatted.contains("$ nonexistent"));
-    assert!(
-        formatted
-            .contains("✗ failed to spawn: command not found")
-    );
+    assert!(formatted.contains("✗ failed to spawn: command not found"));
 }

@@ -26,14 +26,10 @@ pub(super) fn format_output(
     push_header(&mut buffer, executed_command, watcher_name);
 
     match command_result {
-        Ok(command_output)
-            if command_output.status.success() =>
-        {
+        Ok(command_output) if command_output.status.success() => {
             push_success(&mut buffer, &command_output)
         }
-        Ok(command_output) => {
-            push_failure(&mut buffer, &command_output)
-        }
+        Ok(command_output) => push_failure(&mut buffer, &command_output),
         Err(e) => push_spawn_error(&mut buffer, e),
     }
     buffer
@@ -52,24 +48,17 @@ fn push_header(
 }
 
 // Adds success message to buffer.
-fn push_success(
-    buffer: &mut String,
-    command_output: &process::Output,
-) {
+fn push_success(buffer: &mut String, command_output: &process::Output) {
     buffer.push_str("✓ success\n");
     push_trimmed(buffer, &command_output.stdout);
 }
 
 // Adds failure message to buffer.
-fn push_failure(
-    buffer: &mut String,
-    command_output: &process::Output,
-) {
+fn push_failure(buffer: &mut String, command_output: &process::Output) {
     match command_output.status.code() {
-        Some(code) => buffer.push_str(&format!(
-            "✗ failed (exit code {})\n",
-            code
-        )),
+        Some(code) => {
+            buffer.push_str(&format!("✗ failed (exit code {})\n", code))
+        }
         None => buffer.push_str("✗ failed (terminated)\n"),
     }
 

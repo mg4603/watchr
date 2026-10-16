@@ -19,9 +19,7 @@ pub enum ResolverError {
 /// its containing directory.
 ///
 /// Returns a `[ResolverError]` if no config file is found.
-pub fn find_config_file(
-    path: &Path,
-) -> Result<PathBuf, ResolverError> {
+pub fn find_config_file(path: &Path) -> Result<PathBuf, ResolverError> {
     let mut current = path.to_path_buf();
 
     loop {
