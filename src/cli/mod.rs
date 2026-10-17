@@ -57,8 +57,8 @@ pub enum Commands {
 
         /// Comma-separated file extension to filter (e.g.,
         /// `"rs,toml"`); all files if ommitted (CLI mode only)
-        #[arg(long)]
-        ext: Option<String>,
+        #[arg(long, value_delimiter = ',')]
+        ext: Option<Vec<String>>,
 
         /// Command to run on file changes (CLI mode only)
         #[arg(long)]
@@ -90,7 +90,7 @@ impl Commands {
     ///
     /// let cmd = Commands::Watch {
     ///     dir: Some(PathBuf::from("src/")),
-    ///     ext: Some("rs".to_string()),
+    ///     ext: Some(vec!["rs".to_string()]),
     ///     cmd: Some("cargo test".to_string()),
     ///     config: None,
     /// };
@@ -103,10 +103,6 @@ impl Commands {
         match self {
             Commands::Init => Ok(None),
             Commands::Watch { dir, ext, cmd, .. } => {
-                let ext = ext.as_ref().map(|ext| {
-                    ext.split(',').map(|x| x.to_string()).collect()
-                });
-
                 let dir = dir.as_ref();
                 let cmd = cmd.as_ref();
 
@@ -118,7 +114,7 @@ impl Commands {
                     Ok(Some(WatcherEntry {
                         name: None,
                         dirs: vec![dir.unwrap().to_path_buf()],
-                        ext,
+                        ext: ext.clone(),
                         command: cmd.unwrap().to_string(),
                     }))
                 } else {

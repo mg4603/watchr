@@ -39,7 +39,7 @@ fn test_to_entry_cmd_none() {
 fn test_to_entry_with_extension() {
     let watch = Commands::Watch {
         dir: Some(PathBuf::from("./")),
-        ext: Some("rs,toml".to_string()),
+        ext: Some(vec!["rs".to_string(), "toml".to_string()]),
         cmd: Some("cargo test".to_string()),
         config: None,
     };
