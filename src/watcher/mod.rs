@@ -91,14 +91,12 @@ pub fn run_watch(
 
     create_shutdown_handler(tx.clone())?;
 
-    let _debouncers = create_debouncers(
-        config.debounce_ms,
-        config.entries,
-        tx.clone(),
-    )?;
+    // NB: debouncers must stay in scope - dropping them cancels
+    // pending events and stops the watchers. Do not "simplify" to
+    // `let _ = `.
+    let _watch_handles =
+        create_debouncers(config.debounce_ms, config.entries, tx)?;
 
-    // drop initial sender after creating clones
-    drop(tx);
     run_event_loop(rx, writer);
     Ok(())
 }
