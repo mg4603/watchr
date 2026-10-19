@@ -8,7 +8,6 @@ mod debounce;
 mod output;
 mod shutdown;
 
-use std::process;
 use std::sync::mpsc::{Receiver, channel as mpsc_channel};
 
 use notify_debouncer_full::notify;
@@ -108,10 +107,7 @@ fn run_event_loop(
     loop {
         match rx.recv() {
             Ok(WatchEvent::Command { cmd, name }) => {
-                let output = process::Command::new("sh")
-                    .arg("-c")
-                    .arg(&cmd)
-                    .output();
+                let output = execute_command(&cmd);
 
                 let formatted =
                     format_output(&cmd, name.as_deref(), output);
@@ -124,6 +120,10 @@ fn run_event_loop(
             Err(_) => break,
         }
     }
+}
+
+fn execute_command(cmd: &str) -> std::io::Result<std::process::Output> {
+    std::process::Command::new("sh").arg("-c").arg(cmd).output()
 }
 
 #[cfg(test)]
