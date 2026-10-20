@@ -119,10 +119,12 @@ fn run_event_loop(
 
                 let formatted =
                     format_output(&cmd, name.as_deref(), output);
-                let _ = writeln!(writer, "{}", formatted);
+                writeln!(writer, "{}", formatted)
+                    .map_err(WatcherError::WriteError)?;
             }
             Ok(WatchEvent::Shutdown) => {
-                writeln!(writer, "Shutting down gracefully...").ok();
+                writeln!(writer, "Shutting down gracefully...")
+                    .map_err(WatcherError::WriteError)?;
                 return Ok(());
             }
             Err(_) => {
