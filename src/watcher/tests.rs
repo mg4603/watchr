@@ -15,7 +15,7 @@ fn test_run_event_loop_handles_command() {
     tx.send(WatchEvent::Shutdown).unwrap();
     drop(tx);
 
-    run_event_loop(rx, &mut output);
+    let _ = run_event_loop(rx, &mut output);
 
     let result = String::from_utf8(output).unwrap();
     assert!(result.contains("$ echo hello"));
@@ -30,7 +30,7 @@ fn test_run_event_loop_handles_shutdown() {
     tx.send(WatchEvent::Shutdown).unwrap();
     drop(tx);
 
-    run_event_loop(rx, &mut output);
+    let _ = run_event_loop(rx, &mut output);
 
     let result = String::from_utf8(output).unwrap();
     assert!(result.contains("Shutting down gracefully..."));
@@ -43,7 +43,7 @@ fn test_run_event_loop_handles_channel_close() {
 
     drop(tx);
 
-    run_event_loop(rx, &mut output);
+    let _ = run_event_loop(rx, &mut output);
 
     assert!(String::from_utf8(output).unwrap().is_empty());
 }

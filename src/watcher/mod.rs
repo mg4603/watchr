@@ -28,9 +28,17 @@ pub enum WatcherError {
     #[error("notify-debouncer error: {0}")]
     Notify(#[from] notify::Error),
 
+    /// Failed to write to the output writer.
+    #[error("failed to write to output: {0}")]
+    WriteError(#[from] std::io::Error),
+
     /// Failure installing the Ctrl+C signal handler.
     #[error("failed to create shutdown handler: {0}")]
     SignalHandler(#[from] ctrlc::Error),
+
+    /// Unexpected disconnection of the event channel.
+    #[error("channel dropped unexpectedly")]
+    ChannelDisconnected,
 }
 
 /// Events consumed by the event loop.
@@ -96,14 +104,14 @@ pub fn run_watch(
     let _watch_handles =
         create_debouncers(config.debounce_ms, config.entries, tx)?;
 
-    run_event_loop(rx, writer);
+    run_event_loop(rx, writer)?;
     Ok(())
 }
 
 fn run_event_loop(
     rx: Receiver<WatchEvent>,
     writer: &mut dyn std::io::Write,
-) {
+) -> Result<(), WatcherError> {
     loop {
         match rx.recv() {
             Ok(WatchEvent::Command { cmd, name }) => {
@@ -115,9 +123,11 @@ fn run_event_loop(
             }
             Ok(WatchEvent::Shutdown) => {
                 writeln!(writer, "Shutting down gracefully...").ok();
-                break;
+                return Ok(());
             }
-            Err(_) => break,
+            Err(_) => {
+                return Err(WatcherError::ChannelDisconnected);
+            }
         }
     }
 }
