@@ -57,8 +57,8 @@ pub enum Commands {
 
         /// Comma-separated file extension to filter (e.g.,
         /// `"rs,toml"`); all files if ommitted (CLI mode only)
-        #[arg(long)]
-        ext: Option<String>,
+        #[arg(long, value_delimiter = ',')]
+        ext: Option<Vec<String>>,
 
         /// Command to run on file changes (CLI mode only)
         #[arg(long)]
@@ -90,7 +90,7 @@ impl Commands {
     ///
     /// let cmd = Commands::Watch {
     ///     dir: Some(PathBuf::from("src/")),
-    ///     ext: Some("rs".to_string()),
+    ///     ext: Some(vec!["rs".to_string()]),
     ///     cmd: Some("cargo test".to_string()),
     ///     config: None,
     /// };
@@ -99,36 +99,21 @@ impl Commands {
     /// assert!(entry.is_some());
     /// # Ok::<(), CliError>(())
     /// ```
-    pub fn to_entry(
-        &self,
-    ) -> Result<Option<WatcherEntry>, CliError> {
+    pub fn to_entry(&self) -> Result<Option<WatcherEntry>, CliError> {
         match self {
             Commands::Init => Ok(None),
-            Commands::Watch { dir, ext, cmd, .. } => {
-                let ext = ext.as_ref().map(|ext| {
-                    ext.split(',')
-                        .map(|x| x.to_string())
-                        .collect()
-                });
-
-                let dir = dir.as_ref();
-                let cmd = cmd.as_ref();
-
-                if (dir.is_none() && cmd.is_some())
-                    || (cmd.is_none() && dir.is_some())
-                {
+            Commands::Watch { dir, ext, cmd, .. } => match (dir, cmd) {
+                (Some(_), None) | (None, Some(_)) => {
                     Err(CliError::MalformedEntry)
-                } else if dir.is_some() && cmd.is_some() {
-                    Ok(Some(WatcherEntry {
-                        name: None,
-                        dirs: vec![dir.unwrap().to_path_buf()],
-                        ext,
-                        command: cmd.unwrap().to_string(),
-                    }))
-                } else {
-                    Ok(None)
                 }
-            }
+                (Some(dir), Some(cmd)) => Ok(Some(WatcherEntry {
+                    name: None,
+                    dirs: vec![dir.to_path_buf()],
+                    ext: ext.clone(),
+                    command: cmd.to_string(),
+                })),
+                (None, None) => Ok(None),
+            },
         }
     }
 

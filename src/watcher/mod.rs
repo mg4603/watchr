@@ -8,7 +8,6 @@ mod debounce;
 mod output;
 mod shutdown;
 
-use std::process;
 use std::sync::mpsc::{Receiver, channel as mpsc_channel};
 
 use notify_debouncer_full::notify;
@@ -29,9 +28,17 @@ pub enum WatcherError {
     #[error("notify-debouncer error: {0}")]
     Notify(#[from] notify::Error),
 
+    /// Failed to write to the output writer.
+    #[error("failed to write to output: {0}")]
+    WriteError(#[from] std::io::Error),
+
     /// Failure installing the Ctrl+C signal handler.
     #[error("failed to create shutdown handler: {0}")]
     SignalHandler(#[from] ctrlc::Error),
+
+    /// Unexpected disconnection of the event channel.
+    #[error("channel dropped unexpectedly")]
+    ChannelDisconnected,
 }
 
 /// Events consumed by the event loop.
@@ -91,45 +98,44 @@ pub fn run_watch(
 
     create_shutdown_handler(tx.clone())?;
 
-    let _debouncers = create_debouncers(
-        config.debounce_ms,
-        config.entries,
-        tx.clone(),
-    )?;
+    // NB: debouncers must stay in scope - dropping them cancels
+    // pending events and stops the watchers. Do not "simplify" to
+    // `let _ = `.
+    let _watch_handles =
+        create_debouncers(config.debounce_ms, config.entries, tx)?;
 
-    // drop initial sender after creating clones
-    drop(tx);
-    run_event_loop(rx, writer);
+    run_event_loop(rx, writer)?;
     Ok(())
 }
 
 fn run_event_loop(
     rx: Receiver<WatchEvent>,
     writer: &mut dyn std::io::Write,
-) {
+) -> Result<(), WatcherError> {
     loop {
         match rx.recv() {
             Ok(WatchEvent::Command { cmd, name }) => {
-                let output = process::Command::new("sh")
-                    .arg("-c")
-                    .arg(&cmd)
-                    .output();
+                let output = execute_command(&cmd);
 
-                let formatted = format_output(
-                    &cmd,
-                    name.as_deref(),
-                    output,
-                );
-                let _ = writeln!(writer, "{}", formatted);
+                let formatted =
+                    format_output(&cmd, name.as_deref(), output);
+                writeln!(writer, "{}", formatted)
+                    .map_err(WatcherError::WriteError)?;
             }
             Ok(WatchEvent::Shutdown) => {
                 writeln!(writer, "Shutting down gracefully...")
-                    .ok();
-                break;
+                    .map_err(WatcherError::WriteError)?;
+                return Ok(());
             }
-            Err(_) => break,
+            Err(_) => {
+                return Err(WatcherError::ChannelDisconnected);
+            }
         }
     }
+}
+
+fn execute_command(cmd: &str) -> std::io::Result<std::process::Output> {
+    std::process::Command::new("sh").arg("-c").arg(cmd).output()
 }
 
 #[cfg(test)]

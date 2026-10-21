@@ -3,16 +3,16 @@
 use super::{WatchEvent, WatcherError};
 use crate::entry::WatcherEntry;
 use notify_debouncer_full::notify::event::EventKind;
-use notify_debouncer_full::notify::{
-    RecommendedWatcher, RecursiveMode,
-};
+use notify_debouncer_full::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
     DebounceEventResult, DebouncedEvent, Debouncer, NoCache,
     new_debouncer,
 };
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
+type WatchEventDebouncer = Debouncer<RecommendedWatcher, NoCache>;
 /// Creates and registers filesystem watchers for each entry.
 ///
 /// Returns the active debouncers, which must be kept alive for
@@ -44,33 +44,40 @@ pub(super) fn create_debouncers(
     debounce_ms: u64,
     entries: Vec<WatcherEntry>,
     tx: Sender<WatchEvent>,
-) -> Result<
-    Vec<Debouncer<RecommendedWatcher, NoCache>>,
-    WatcherError,
-> {
-    let mut debouncers = Vec::new();
-    for WatcherEntry {
-        name,
-        dirs,
-        ext,
-        command,
-    } in entries
-    {
-        let tx = tx.clone();
-        let mut debouncer = new_debouncer(
-            Duration::from_millis(debounce_ms),
-            None,
-            debounced_events_result_handler(
-                name, ext, command, tx,
-            ),
-        )?;
+) -> Result<Vec<WatchEventDebouncer>, WatcherError> {
+    entries
+        .into_iter()
+        .map(|entry| {
+            create_debouncer_for_entry(debounce_ms, entry, tx.clone())
+        })
+        .collect()
+}
 
-        for dir in &dirs {
-            debouncer.watch(dir, RecursiveMode::Recursive)?;
-        }
-        debouncers.push(debouncer);
+fn create_debouncer_for_entry(
+    debounce_ms: u64,
+    entry: WatcherEntry,
+    tx: Sender<WatchEvent>,
+) -> Result<WatchEventDebouncer, WatcherError> {
+    let WatcherEntry { name, dirs, ext, command } = entry;
+
+    let mut debouncer = new_debouncer(
+        Duration::from_millis(debounce_ms),
+        None,
+        debounced_events_result_handler(name, ext, command, tx),
+    )?;
+
+    watch_dirs(&mut debouncer, &dirs)?;
+    Ok(debouncer)
+}
+
+fn watch_dirs(
+    debouncer: &mut WatchEventDebouncer,
+    dirs: &[PathBuf],
+) -> Result<(), WatcherError> {
+    for dir in dirs {
+        debouncer.watch(dir, RecursiveMode::Recursive)?;
     }
-    Ok(debouncers)
+    Ok(())
 }
 
 // Returns a closure for [`new_debouncer`] that forwards
@@ -111,70 +118,75 @@ pub(super) fn handle_events(
                 "received debounced events"
             );
 
-            for event in &events {
-                tracing::debug!(
-                    paths = ?event.paths,
-                    kind = ?event.event.kind, "event detail"
-                );
-
-                if !matches!(
-                    event.event.kind,
-                    EventKind::Modify(_)
-                        | EventKind::Create(_)
-                        | EventKind::Remove(_)
-                ) {
-                    continue;
-                }
-
-                if check_extensions(
-                    event,
-                    extensions_to_filter.as_ref(),
-                ) {
-                    tracing::debug!(
-                        command = %command_on_fs_mutation,
-                        "sending command event");
-
-                    let _ = tx.send(WatchEvent::Command {
-                        cmd: command_on_fs_mutation.clone(),
-                        name: watcher_name.clone(),
-                    });
-
-                    return;
-                }
+            if has_matching_event(
+                &events,
+                extensions_to_filter.as_deref(),
+            ) {
+                send_command(tx, command_on_fs_mutation, watcher_name);
             }
         }
 
-        Err(errors) => {
-            for e in errors {
-                tracing::error!(
-                error = %e,
-                "failed to process file watch event"
-                );
-            }
-        }
+        Err(errors) => log_errors(errors),
     }
+}
+
+fn is_relevant_path(path: &Path, exts: Option<&[String]>) -> bool {
+    path.is_file() && check_extensions(path, exts)
+}
+
+fn has_matching_event(
+    events: &[DebouncedEvent],
+    exts: Option<&[String]>,
+) -> bool {
+    events.iter().inspect(|event| log_event(event)).any(|event| {
+        is_mutation(&event.event.kind)
+            && event.paths.iter().any(|path| is_relevant_path(path, exts))
+    })
+}
+
+fn send_command(
+    tx: Sender<WatchEvent>,
+    command: String,
+    name: Option<String>,
+) {
+    tracing::debug!(command = %command, "sending command event");
+    let _ = tx.send(WatchEvent::Command { cmd: command, name });
+}
+
+fn log_errors<E: std::fmt::Display>(errors: impl IntoIterator<Item = E>) {
+    for e in errors {
+        tracing::error!(error = %e, "failed to process file watch event");
+    }
+}
+
+fn log_event(event: &DebouncedEvent) {
+    tracing::debug!(paths = ?event.paths, kind = ?event.event.kind, "event detail");
+}
+
+fn is_mutation(kind: &EventKind) -> bool {
+    matches!(
+        kind,
+        EventKind::Modify(_)
+            | EventKind::Create(_)
+            | EventKind::Remove(_)
+    )
 }
 
 // Returns `true` if no extension filter is configured, or one
 // of the event's file paths matches a filtered extension.
 fn check_extensions(
-    event: &DebouncedEvent,
-    extensions_to_filter: Option<&Vec<String>>,
+    path: &Path,
+    extensions_to_filter: Option<&[String]>,
 ) -> bool {
-    event.paths.iter().any(|path| {
-        if !path.is_file() {
-            return false;
-        }
-        match extensions_to_filter {
-            None => true,
-            Some(extensions) => extensions.iter().any(|ext| {
-                path.extension()
-                    .and_then(|os_str| os_str.to_str())
-                    .map(|s| s == ext)
-                    .unwrap_or(false)
-            }),
-        }
-    })
+    match extensions_to_filter {
+        None => true,
+        Some(extensions) => extensions.iter().any(|ext| {
+            path.extension()
+                .and_then(|os_str| os_str.to_str())
+                .map(|s| s == ext)
+                .unwrap_or(false)
+        }),
+    }
 }
 
 #[cfg(test)]
