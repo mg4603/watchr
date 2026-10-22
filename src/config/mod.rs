@@ -16,7 +16,7 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::entry::WatcherEntry;
-use crate::resolver::{ResolverError, find_config_file};
+use crate::resolver::{ResolverError, resolve_config_path};
 
 /// Error reading, parsing, or validating a configuration.
 #[derive(Error, Debug)]
@@ -100,7 +100,7 @@ fn resolve_config(
 ) -> Result<WatcherConfig, ConfigError> {
     let mut resolved_config_path = config_path;
     if entry.is_none() && resolved_config_path.is_none() {
-        resolved_config_path = find_config_file(&start_dir).ok();
+        resolved_config_path = resolve_config_path(&start_dir).ok();
     }
 
     if let Some(entry) = entry {

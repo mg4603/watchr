@@ -23,7 +23,9 @@ pub enum ResolverError {
 /// its containing directory.
 ///
 /// Returns a `[ResolverError]` if no config file is found.
-pub fn find_config_file(path: &Path) -> Result<PathBuf, ResolverError> {
+pub fn resolve_config_path(
+    path: &Path,
+) -> Result<PathBuf, ResolverError> {
     if path.is_file() {
         return Ok(path.to_path_buf());
     }
