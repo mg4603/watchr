@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
-/// Error when the config file cannot be found.
+/// Error returned when resolving the config file location.
 #[derive(Debug, Error)]
 pub enum ResolverError {
     /// No config file in the directory or its parents.
@@ -16,27 +16,33 @@ pub enum ResolverError {
     InvalidPath,
 }
 
-/// Find `.watchr.toml` in `path` or, failing that, in its
-/// parent directories, up to the filesystem root.
+/// Resolve the location of the config file.
 ///
-/// `path` should be a directory; a file path is treated as
-/// its containing directory.
+/// - If `path` is a file, it is returned as-is.
+/// - If it is a directory, `.watchr.toml` is searched for there and in
+///   each parent directory, up to the filesystem root
 ///
-/// Returns a `[ResolverError]` if no config file is found.
+/// Returns a `[ResolverError]` if `path` is neither file nor directory,
+/// or if no config file is found.
 pub fn resolve_config_path(
     path: &Path,
 ) -> Result<PathBuf, ResolverError> {
     if path.is_file() {
         return Ok(path.to_path_buf());
     }
-
     if !path.is_dir() {
         return Err(ResolverError::InvalidPath);
     }
+    find_in_tree(path, ".watchr.toml")
+}
 
-    let mut current = path.to_path_buf();
+fn find_in_tree(
+    start: &Path,
+    file_name: &str,
+) -> Result<PathBuf, ResolverError> {
+    let mut current = start.to_path_buf();
     loop {
-        let candidate = current.join(".watchr.toml");
+        let candidate = current.join(file_name);
         if candidate.is_file() {
             return Ok(candidate);
         }
