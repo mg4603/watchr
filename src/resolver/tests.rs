@@ -1,41 +1,99 @@
 use super::*;
 
-use std::fs;
-use tempfile::TempDir;
+mod resolve_config_path {
 
-#[test]
-fn test_config_file_present() {
-    let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path();
-    let file_path = path.join(".watchr.toml");
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
 
-    fs::write(&file_path, "").unwrap();
+    #[test]
+    fn explicit_file_is_returned_as_is() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("config.toml");
+        fs::write(&path, "test").unwrap();
 
-    let result = find_config_file(path).unwrap();
+        let result = resolve_config_path(&path).unwrap();
+        assert_eq!(result, path);
+    }
 
-    assert_eq!(result, file_path)
+    #[test]
+    fn nonexistent_path_is_invalid() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join(".watchr.toml");
+
+        let result = resolve_config_path(&path);
+        assert!(matches!(result, Err(ResolverError::InvalidPath)));
+    }
+
+    #[test]
+    fn directory_delegates_to_find_in_tree() {
+        let tmp = TempDir::new().unwrap();
+        let conf = tmp.path().join(".watchr.toml");
+        fs::write(&conf, "").unwrap();
+
+        let result = resolve_config_path(tmp.path()).unwrap();
+        assert_eq!(result, conf);
+    }
 }
 
-#[test]
-fn test_config_file_absent() {
-    let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path();
+mod find_in_tree {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
 
-    let result = find_config_file(path);
-    assert!(matches!(result, Err(ResolverError::NotFound)))
-}
+    #[test]
+    fn found_at_start() {
+        let tmp = TempDir::new().unwrap();
+        let conf = tmp.path().join(".watchr.toml");
+        fs::write(&conf, "test").unwrap();
 
-#[test]
-fn test_config_file_present_in_parent() {
-    let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path();
-    let conf_path = path.join(".watchr.toml");
+        let result = find_in_tree(tmp.path(), ".watchr.toml").unwrap();
+        assert_eq!(result, conf);
+    }
 
-    fs::write(&conf_path, "").unwrap();
+    #[test]
+    fn not_found() {
+        let tmp = TempDir::new().unwrap();
+        let result = find_in_tree(tmp.path(), ".watchr.toml");
+        assert!(matches!(result, Err(ResolverError::NotFound)));
+    }
 
-    let sub_dir = path.join("subdir/subdir1/subdir2");
-    fs::create_dir_all(&sub_dir).unwrap();
+    #[test]
+    fn found_in_ancestor() {
+        let tmp = TempDir::new().unwrap();
+        let sub_dir = tmp.path().join("a");
+        fs::create_dir(&sub_dir).unwrap();
 
-    let result = find_config_file(&sub_dir).unwrap();
-    assert_eq!(result, conf_path);
+        let conf = tmp.path().join(".watchr.toml");
+        fs::write(&conf, "test").unwrap();
+
+        let result = find_in_tree(&sub_dir, ".watchr.toml").unwrap();
+        assert_eq!(result, conf);
+    }
+
+    #[test]
+    fn skips_directory_named_like_config() {
+        let tmp = TempDir::new().unwrap();
+        let dir_named_like_config = tmp.path().join(".watchr.toml");
+        fs::create_dir(&dir_named_like_config).unwrap();
+
+        let result = find_in_tree(&dir_named_like_config, ".watchr.toml");
+        assert!(matches!(result, Err(ResolverError::NotFound)));
+    }
+
+    #[test]
+    fn prefers_nearest_match() {
+        let tmp = TempDir::new().unwrap();
+        let sub_dir = tmp.path().join("a");
+        fs::create_dir(&sub_dir).unwrap();
+
+        let conf = tmp.path().join(".watchr.toml");
+        let sub_conf = sub_dir.join(".watchr.toml");
+
+        fs::write(&conf, "test").unwrap();
+        fs::write(&sub_conf, "test").unwrap();
+
+        let result = find_in_tree(&sub_dir, ".watchr.toml").unwrap();
+        assert_eq!(result, sub_conf);
+    }
 }
