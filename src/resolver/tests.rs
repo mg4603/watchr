@@ -34,6 +34,25 @@ mod resolve_config_path {
         let result = resolve_config_path(tmp.path()).unwrap();
         assert_eq!(result, conf);
     }
+
+    #[test]
+    fn resolves_relative_path_to_config_file() {
+        let tmp = TempDir::new().unwrap();
+        let conf = tmp.path().join(".watchr.toml");
+        fs::write(&conf, "test").unwrap();
+
+        let sub_dir = tmp.path().join("a");
+        fs::create_dir(&sub_dir).unwrap();
+
+        let original_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(tmp.path()).unwrap();
+        let result = resolve_config_path(Path::new("a"));
+        std::env::set_current_dir(original_cwd).unwrap();
+
+        let resolved = result.expect("relative path should resolve");
+        assert!(resolved.is_absolute());
+        assert_eq!(resolved, conf);
+    }
 }
 
 mod find_in_tree {
