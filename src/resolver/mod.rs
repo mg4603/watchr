@@ -27,13 +27,12 @@ pub enum ResolverError {
 pub fn resolve_config_path(
     path: &Path,
 ) -> Result<PathBuf, ResolverError> {
+    let path =
+        path.canonicalize().map_err(|_| ResolverError::InvalidPath)?;
     if path.is_file() {
         return Ok(path.to_path_buf());
     }
-    if !path.is_dir() {
-        return Err(ResolverError::InvalidPath);
-    }
-    find_in_tree(path, ".watchr.toml")
+    find_in_tree(&path, ".watchr.toml")
 }
 
 fn find_in_tree(
