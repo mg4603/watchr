@@ -8,7 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use thiserror::Error;
 
 use crate::entry::WatcherEntry;
@@ -51,23 +51,26 @@ pub enum Commands {
     /// Reads from a `.watchr.toml` (either `--config` or
     /// discovered by walking up from the cwd), or defines a
     /// single watcher inline via `--dir` and `--cmd`.
-    Watch {
-        /// Directory to watch (CLI mode only)
-        dir: Option<PathBuf>,
+    Watch(WatchArgs),
+}
 
-        /// Comma-separated file extension to filter (e.g.,
-        /// `"rs,toml"`); all files if ommitted (CLI mode only)
-        #[arg(long, value_delimiter = ',')]
-        ext: Option<Vec<String>>,
+#[derive(Args, Debug)]
+pub struct WatchArgs {
+    /// Directory to watch (CLI mode only)
+    dir: Option<PathBuf>,
 
-        /// Command to run on file changes (CLI mode only)
-        #[arg(long)]
-        cmd: Option<String>,
+    /// Comma-separated file extension to filter (e.g.,
+    /// `"rs,toml"`); all files if ommitted (CLI mode only)
+    #[arg(long, value_delimiter = ',')]
+    ext: Option<Vec<String>>,
 
-        /// Explicit path to config file, overriding discovery
-        #[arg(long)]
-        config: Option<PathBuf>,
-    },
+    /// Command to run on file changes (CLI mode only)
+    #[arg(long)]
+    cmd: Option<String>,
+
+    /// Explicit path to config file, overriding discovery
+    #[arg(long)]
+    config: Option<PathBuf>,
 }
 
 impl Commands {
