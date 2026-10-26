@@ -73,12 +73,11 @@ pub struct WatchArgs {
     config: Option<PathBuf>,
 }
 
-impl Commands {
+impl WatchArgs {
     /// Converts CLI arguments into a [`WatcherEntry`] when
     /// `--dir` and `--cmd` are provided.
     ///
-    /// Returns `Ok(None)` in config mode (neither flag provided) and
-    /// for `Init` command.
+    /// Returns `Ok(None)` in config mode (neither flag provided).
     ///
     /// # Errors
     ///
@@ -103,54 +102,29 @@ impl Commands {
     /// # Ok::<(), CliError>(())
     /// ```
     pub fn to_entry(&self) -> Result<Option<WatcherEntry>, CliError> {
-        match self {
-            Commands::Init => Ok(None),
-            Commands::Watch { dir, ext, cmd, .. } => match (dir, cmd) {
-                (Some(_), None) | (None, Some(_)) => {
-                    Err(CliError::MalformedEntry)
-                }
-                (Some(dir), Some(cmd)) => Ok(Some(WatcherEntry {
-                    name: None,
-                    dirs: vec![dir.to_path_buf()],
-                    ext: ext.clone(),
-                    command: cmd.to_string(),
-                })),
-                (None, None) => Ok(None),
-            },
+        match (&self.dir, &self.cmd) {
+            (Some(_), None) | (None, Some(_)) => {
+                Err(CliError::MalformedEntry)
+            }
+            (Some(dir), Some(cmd)) => Ok(Some(WatcherEntry {
+                name: None,
+                dirs: vec![dir.to_path_buf()],
+                ext: self.ext.clone(),
+                command: cmd.to_string(),
+            })),
+            (None, None) => Ok(None),
         }
     }
 
     /// Extracts the config file path from `--config` flag.
     ///
-    /// Returns `None` for `Init` command or when `--config` was not
-    /// provided.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use watchr::cli::Commands;
-    /// use std::path::PathBuf;
-    ///
-    /// let cmd = Commands::Watch {
-    ///     dir: None,
-    ///     ext: None,
-    ///     cmd: None,
-    ///     config: Some(
-    ///         PathBuf::from(".watchr.toml")
-    ///     ),
-    /// };
-    ///
-    /// assert!(cmd.config_path().is_some());
-    /// ```
+    /// Returns `None` when `--config` is not provided.
     pub fn config_path(&self) -> Option<&Path> {
-        match self {
-            Commands::Init => None,
-            Commands::Watch { config, .. } => {
-                config.as_ref().map(|c| c.as_path())
-            }
-        }
+        self.config.as_deref()
     }
+}
 
+impl Commands {
     /// Returns `true` if this is the [`Commands::Init`] command.
     ///
     /// # Examples

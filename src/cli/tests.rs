@@ -8,7 +8,7 @@ fn test_to_entry_init() {
 
 #[test]
 fn test_to_entry_watch_dir_none() {
-    let watch = Commands::Watch {
+    let watch = WatchArgs {
         dir: None,
         ext: None,
         config: None,
@@ -20,13 +20,13 @@ fn test_to_entry_watch_dir_none() {
 #[test]
 fn test_to_entry_cmd_dir_none() {
     let watch =
-        Commands::Watch { dir: None, ext: None, config: None, cmd: None };
+        WatchArgs { dir: None, ext: None, config: None, cmd: None };
     assert!(watch.to_entry().unwrap().is_none())
 }
 
 #[test]
 fn test_to_entry_cmd_none() {
-    let watch = Commands::Watch {
+    let watch = WatchArgs {
         dir: Some(PathBuf::from("./")),
         ext: None,
         config: None,
@@ -37,7 +37,7 @@ fn test_to_entry_cmd_none() {
 
 #[test]
 fn test_to_entry_with_extension() {
-    let watch = Commands::Watch {
+    let watch = WatchArgs {
         dir: Some(PathBuf::from("./")),
         ext: Some(vec!["rs".to_string(), "toml".to_string()]),
         cmd: Some("cargo test".to_string()),
@@ -54,7 +54,7 @@ fn test_to_entry_with_extension() {
 
 #[test]
 fn test_to_entry_happy_path() {
-    let watch = Commands::Watch {
+    let watch = WatchArgs {
         dir: Some(PathBuf::from("./")),
         ext: None,
         config: None,
@@ -80,13 +80,13 @@ fn test_config_path_init() {
 #[test]
 fn test_config_path_watch_config_none() {
     let watch =
-        Commands::Watch { dir: None, ext: None, cmd: None, config: None };
+        WatchArgs { dir: None, ext: None, cmd: None, config: None };
     assert!(watch.config_path().is_none())
 }
 
 #[test]
 fn test_config_path_watch_config_is_not_none() {
-    let watch = Commands::Watch {
+    let watch = WatchArgs {
         dir: None,
         ext: None,
         cmd: None,
@@ -104,6 +104,6 @@ fn test_is_init_true() {
 #[test]
 fn test_is_init_false() {
     let watch =
-        Commands::Watch { dir: None, ext: None, cmd: None, config: None };
+        WatchArgs { dir: None, ext: None, cmd: None, config: None };
     assert!(!watch.is_init());
 }
