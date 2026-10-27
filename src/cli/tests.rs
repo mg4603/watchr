@@ -1,12 +1,6 @@
 use super::*;
 
 #[test]
-fn test_to_entry_init() {
-    let init = Commands::Init;
-    assert!(init.to_entry().unwrap().is_none());
-}
-
-#[test]
 fn test_to_entry_watch_dir_none() {
     let watch = WatchArgs {
         dir: None,
@@ -72,12 +66,6 @@ fn test_to_entry_happy_path() {
 }
 
 #[test]
-fn test_config_path_init() {
-    let init = Commands::Init;
-    assert!(init.config_path().is_none());
-}
-
-#[test]
 fn test_config_path_watch_config_none() {
     let watch =
         WatchArgs { dir: None, ext: None, cmd: None, config: None };
@@ -93,17 +81,4 @@ fn test_config_path_watch_config_is_not_none() {
         config: Some(PathBuf::from("./")),
     };
     assert_eq!(watch.config_path(), Some(PathBuf::from("./").as_path()));
-}
-
-#[test]
-fn test_is_init_true() {
-    let init = Commands::Init;
-    assert!(init.is_init());
-}
-
-#[test]
-fn test_is_init_false() {
-    let watch =
-        WatchArgs { dir: None, ext: None, cmd: None, config: None };
-    assert!(!watch.is_init());
 }

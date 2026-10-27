@@ -12,7 +12,7 @@
 use clap::Parser;
 use thiserror::Error;
 
-use watchr::cli::{Cli, CliError};
+use watchr::cli::{Cli, CliError, Commands};
 use watchr::config::{ConfigError, prepare_config};
 use watchr::init::{InitError, run_init};
 
@@ -67,16 +67,19 @@ fn run(
     cli: Cli,
     writer: &mut dyn std::io::Write,
 ) -> Result<(), MainError> {
-    if cli.command.is_init() {
-        run_init(&std::env::current_dir()?)?;
-        writeln!(writer, ".watchr.toml created").ok();
-    } else {
-        let config = prepare_config(
-            cli.command.to_entry()?,
-            cli.command.config_path().map(|p| p.to_path_buf()),
-            std::env::current_dir()?,
-        )?;
-        run_watch(config, writer)?;
+    match cli.command {
+        Commands::Init => {
+            run_init(&std::env::current_dir()?)?;
+            writeln!(writer, ".watchr.toml created").ok();
+        }
+        Commands::Watch(args) => {
+            let config = prepare_config(
+                args.to_entry()?,
+                args.config_path().map(|p| p.to_path_buf()),
+                std::env::current_dir()?,
+            )?;
+            run_watch(config, writer)?;
+        }
     }
     Ok(())
 }

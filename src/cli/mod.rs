@@ -83,24 +83,6 @@ impl WatchArgs {
     ///
     /// Returns [`CliError::MalformedEntry`] if only one of `--dir`
     /// or `--cmd` is provided
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use watchr::cli::{Commands, CliError};
-    /// use std::path::PathBuf;
-    ///
-    /// let cmd = Commands::Watch {
-    ///     dir: Some(PathBuf::from("src/")),
-    ///     ext: Some(vec!["rs".to_string()]),
-    ///     cmd: Some("cargo test".to_string()),
-    ///     config: None,
-    /// };
-    ///
-    /// let entry = cmd.to_entry()?;
-    /// assert!(entry.is_some());
-    /// # Ok::<(), CliError>(())
-    /// ```
     pub fn to_entry(&self) -> Result<Option<WatcherEntry>, CliError> {
         match (&self.dir, &self.cmd) {
             (Some(_), None) | (None, Some(_)) => {
@@ -121,33 +103,6 @@ impl WatchArgs {
     /// Returns `None` when `--config` is not provided.
     pub fn config_path(&self) -> Option<&Path> {
         self.config.as_deref()
-    }
-}
-
-impl Commands {
-    /// Returns `true` if this is the [`Commands::Init`] command.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use watchr::cli::Commands;
-    ///
-    /// let cmd = Commands::Init;
-    /// assert!(cmd.is_init());
-    ///
-    /// let cmd = Commands::Watch {
-    ///     dir: None,
-    ///     ext: None,
-    ///     cmd: None,
-    ///     config: None,
-    /// };
-    /// assert!(!cmd.is_init());
-    /// ```
-    pub fn is_init(&self) -> bool {
-        match self {
-            Commands::Init => true,
-            Commands::Watch { .. } => false,
-        }
     }
 }
 
