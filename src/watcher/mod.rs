@@ -4,6 +4,7 @@
 //! and dispatches commands when matching file changes occur.
 //!
 //! See [`WatcherError`] for failure modes.
+mod command;
 mod debounce;
 mod output;
 mod shutdown;
@@ -15,6 +16,7 @@ use thiserror::Error;
 
 use crate::config::WatcherConfig;
 
+use command::{CommandRunner, ShellRunner};
 use debounce::create_debouncers;
 use output::format_output;
 use shutdown::create_shutdown_handler;
@@ -104,18 +106,20 @@ pub fn run_watch(
     let _watch_handles =
         create_debouncers(config.debounce_ms, config.entries, tx)?;
 
-    run_event_loop(rx, writer)?;
+    let runner = ShellRunner;
+    run_event_loop(rx, &runner, writer)?;
     Ok(())
 }
 
-fn run_event_loop(
+fn run_event_loop<R: CommandRunner>(
     rx: Receiver<WatchEvent>,
+    runner: &R,
     writer: &mut dyn std::io::Write,
 ) -> Result<(), WatcherError> {
     loop {
         match rx.recv() {
             Ok(WatchEvent::Command { cmd, name }) => {
-                let output = execute_command(&cmd);
+                let output = runner.run(&cmd);
 
                 let formatted =
                     format_output(&cmd, name.as_deref(), output);
@@ -132,10 +136,6 @@ fn run_event_loop(
             }
         }
     }
-}
-
-fn execute_command(cmd: &str) -> std::io::Result<std::process::Output> {
-    std::process::Command::new("sh").arg("-c").arg(cmd).output()
 }
 
 #[cfg(test)]
