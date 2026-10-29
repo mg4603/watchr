@@ -16,3 +16,15 @@ impl CommandRunner for FakeRunner {
         })
     }
 }
+
+#[test]
+fn test_shell_runner_run() {
+    let runner = ShellRunner;
+    let result = runner.run("echo hello").unwrap();
+
+    assert!(result.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&result.stdout).trim(),
+        "hello".to_string()
+    );
+}
