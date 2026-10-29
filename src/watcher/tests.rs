@@ -1,68 +1,120 @@
 use super::*;
+use std::io::{Error, Result, Write};
 
-use std::sync::mpsc::channel as mpsc_channel;
+struct FailingWriter;
 
-use crate::watcher::command::tests::FakeRunner;
-
-#[test]
-#[cfg(unix)]
-fn test_run_event_loop_handles_shutdown() {
-    let (tx, rx) = mpsc_channel();
-    let mut output = Vec::new();
-    let runner = FakeRunner {
-        status: 0,
-        stdout: b"test output".to_vec(),
-        stderr: Vec::new(),
-    };
-
-    tx.send(WatchEvent::Shutdown).unwrap();
-    drop(tx);
-
-    let _ = run_event_loop(rx, &runner, &mut output);
-
-    let result = String::from_utf8(output).unwrap();
-    assert!(result.contains("Shutting down gracefully..."));
+impl Write for FailingWriter {
+    fn write(&mut self, _buf: &[u8]) -> Result<usize> {
+        Err(Error::other("write failed"))
+    }
+    fn flush(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
-#[test]
 #[cfg(unix)]
-fn test_run_event_loop_handles_channel_close() {
-    let (tx, rx) = mpsc_channel();
-    let mut output = Vec::new();
-    let runner = FakeRunner {
-        status: 0,
-        stdout: b"test output".to_vec(),
-        stderr: Vec::new(),
-    };
-    drop(tx);
+mod run_event_loop_tests {
+    use super::*;
 
-    let _ = run_event_loop(rx, &runner, &mut output);
+    use crate::watcher::command::tests::FakeRunner;
+    use std::sync::mpsc::channel as mpsc_channel;
 
-    assert!(String::from_utf8(output).unwrap().is_empty());
-}
+    #[test]
+    fn shutdown_handled() {
+        let (tx, rx) = mpsc_channel();
+        let mut output = Vec::new();
+        let runner = FakeRunner {
+            status: 0,
+            stdout: b"test output".to_vec(),
+            stderr: Vec::new(),
+        };
 
-#[test]
-#[cfg(unix)]
-fn test_run_event_loop_handles_command() {
-    let (tx, rx) = mpsc_channel();
-    let mut output = Vec::new();
-    let runner = FakeRunner {
-        status: 0,
-        stdout: b"hello".to_vec(),
-        stderr: Vec::new(),
-    };
+        tx.send(WatchEvent::Shutdown).unwrap();
+        drop(tx);
 
-    tx.send(WatchEvent::Command {
-        cmd: "echo hello".to_string(),
-        name: None,
-    })
-    .unwrap();
-    tx.send(WatchEvent::Shutdown).unwrap();
-    drop(tx);
+        let _ = run_event_loop(rx, &runner, &mut output);
 
-    let _ = run_event_loop(rx, &runner, &mut output);
+        let result = String::from_utf8(output).unwrap();
+        assert!(result.contains("Shutting down gracefully..."));
+    }
 
-    let result = String::from_utf8(output).unwrap();
-    assert!(result.contains("$ echo hello"));
-    assert!(result.contains("✓ success"));
+    #[test]
+    fn channel_close_handled() {
+        let (tx, rx) = mpsc_channel();
+        let mut output = Vec::new();
+        let runner = FakeRunner {
+            status: 0,
+            stdout: b"test output".to_vec(),
+            stderr: Vec::new(),
+        };
+        drop(tx);
+
+        let _ = run_event_loop(rx, &runner, &mut output);
+
+        assert!(String::from_utf8(output).unwrap().is_empty());
+    }
+
+    #[test]
+    fn command_executes_output_written() {
+        let (tx, rx) = mpsc_channel();
+        let mut output = Vec::new();
+        let runner = FakeRunner {
+            status: 0,
+            stdout: b"hello".to_vec(),
+            stderr: Vec::new(),
+        };
+
+        tx.send(WatchEvent::Command {
+            cmd: "echo hello".to_string(),
+            name: None,
+        })
+        .unwrap();
+        tx.send(WatchEvent::Shutdown).unwrap();
+        drop(tx);
+
+        let _ = run_event_loop(rx, &runner, &mut output);
+
+        let result = String::from_utf8(output).unwrap();
+        assert!(result.contains("$ echo hello"));
+        assert!(result.contains("✓ success"));
+    }
+
+    #[test]
+    fn writeln_error_command_arm() {
+        let (tx, rx) = mpsc_channel();
+        let mut writer = FailingWriter;
+        let runner = FakeRunner {
+            status: 0,
+            stdout: b"hello".to_vec(),
+            stderr: Vec::new(),
+        };
+
+        tx.send(WatchEvent::Command {
+            cmd: "echo hello".to_string(),
+            name: None,
+        })
+        .unwrap();
+        tx.send(WatchEvent::Shutdown).unwrap();
+        drop(tx);
+
+        let result = run_event_loop(rx, &runner, &mut writer);
+        assert!(matches!(result, Err(WatcherError::WriteError(_))));
+    }
+
+    #[test]
+    fn writeln_error_shutdown_arm() {
+        let (tx, rx) = mpsc_channel();
+        let mut writer = FailingWriter;
+        let runner = FakeRunner {
+            status: 0,
+            stdout: b"hello".to_vec(),
+            stderr: Vec::new(),
+        };
+
+        tx.send(WatchEvent::Shutdown).unwrap();
+        drop(tx);
+
+        let result = run_event_loop(rx, &runner, &mut writer);
+        assert!(matches!(result, Err(WatcherError::WriteError(_))));
+    }
 }
