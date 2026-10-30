@@ -1,16 +1,6 @@
 use super::*;
-use std::io::{Error, Result, Write};
 
-struct FailingWriter;
-
-impl Write for FailingWriter {
-    fn write(&mut self, _buf: &[u8]) -> Result<usize> {
-        Err(Error::other("write failed"))
-    }
-    fn flush(&mut self) -> Result<()> {
-        Ok(())
-    }
-}
+use crate::test_helpers::FailingWriter;
 
 #[cfg(unix)]
 mod run_event_loop_tests {

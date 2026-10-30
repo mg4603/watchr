@@ -5,3 +5,6 @@ pub mod init;
 pub mod resolver;
 pub mod tracing;
 pub mod watcher;
+
+#[cfg(test)]
+mod test_helpers;
