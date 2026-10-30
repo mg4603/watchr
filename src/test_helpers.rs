@@ -10,3 +10,14 @@ impl Write for FailingWriter {
         Ok(())
     }
 }
+
+pub(crate) struct FlushFailingWriter;
+
+impl Write for FlushFailingWriter {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> Result<()> {
+        Err(Error::other("flush failed"))
+    }
+}
