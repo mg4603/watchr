@@ -10,8 +10,13 @@ use std::sync::mpsc::Sender;
 pub(super) fn create_shutdown_handler(
     tx: Sender<WatchEvent>,
 ) -> Result<(), WatcherError> {
-    ctrlc::try_set_handler(move || {
-        let _ = tx.send(WatchEvent::Shutdown);
-    })?;
+    ctrlc::try_set_handler(move || send_shutdown(&tx))?;
     Ok(())
 }
+
+fn send_shutdown(tx: &Sender<WatchEvent>) {
+    let _ = tx.send(WatchEvent::Shutdown);
+}
+
+#[cfg(test)]
+mod tests;
