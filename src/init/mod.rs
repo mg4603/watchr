@@ -22,6 +22,7 @@ pub enum InitError {
     Io(#[from] std::io::Error),
 }
 
+const CONFIG_FILE_NAME: &str = ".watchr.toml";
 const DEFAULT_CONFIG_TEMPLATE: &str = r#"
 # watchr configuration file
 # Debounce time in milliseconds (default: 500)
@@ -60,13 +61,20 @@ debounce_ms = 500
 /// # Ok::<(), watchr::init::InitError>(())
 /// ```
 pub fn run_init(path: &Path) -> Result<(), InitError> {
-    let path = path.join(".watchr.toml");
-    if path.exists() {
-        return Err(InitError::FileAlreadyExists);
-    }
+    let config_path = path.join(CONFIG_FILE_NAME);
 
-    let mut file = File::create(path)?;
+    let mut file = open_new(&config_path)?;
     write_template(&mut file, DEFAULT_CONFIG_TEMPLATE)
+}
+
+fn open_new(config_path: &Path) -> Result<File, InitError> {
+    match File::options().write(true).create_new(true).open(config_path) {
+        Ok(f) => Ok(f),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            Err(InitError::FileAlreadyExists)
+        }
+        Err(e) => Err(InitError::Io(e)),
+    }
 }
 
 fn write_template<W: Write>(

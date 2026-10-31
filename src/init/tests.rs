@@ -40,6 +40,49 @@ mod run_init_tests {
     }
 }
 
+mod open_new_tests {
+    use super::*;
+
+    #[test]
+    fn already_exists() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("test");
+
+        open_new(&path).unwrap();
+        let err = open_new(&path).unwrap_err();
+
+        assert!(matches!(err, InitError::FileAlreadyExists));
+    }
+
+    #[test]
+    fn creates_new_file() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("test");
+
+        open_new(&path).unwrap();
+
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn existing_content_is_untouched() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("test");
+        fs::write(&path, "existing").unwrap();
+
+        open_new(&path).unwrap_err();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), "existing");
+    }
+
+    #[test]
+    fn missing_parent_dir_is_io_error() {
+        let path = TempDir::new().unwrap().path().join("na").join("test");
+        let err = open_new(&path).unwrap_err();
+        assert!(matches!(err, InitError::Io(_)));
+    }
+}
+
 mod write_template_tests {
     use super::*;
     #[test]
