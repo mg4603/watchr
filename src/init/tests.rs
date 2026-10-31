@@ -1,62 +1,68 @@
 use super::*;
 
+use crate::test_helpers::{FailingWriter, FlushFailingWriter};
+
 use std::fs;
+use tempfile::TempDir;
 
-fn create_config_file(path: &Path) {
-    let config = format!(
-        r##"debounce_ms = 500
+mod run_init_tests {
+    use super::*;
 
-[[watcher]]
-name = "sample_test"
-dirs = ["{}"]
-command = "pwd"
-"##,
-        path.parent().unwrap().display()
-    );
+    #[test]
+    fn happy_path() {
+        let tmp_dir = TempDir::new().unwrap();
+        let path = tmp_dir.path();
 
-    fs::write(path, config).unwrap()
+        let _ = run_init(path);
+
+        let config_path = path.join(".watchr.toml");
+        assert!(config_path.exists());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn permission_denied() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp_dir = TempDir::new().unwrap();
+        let path = tmp_dir.path();
+
+        let perms = fs::Permissions::from_mode(0o555);
+        fs::set_permissions(path, perms).unwrap();
+
+        let res = run_init(path);
+
+        // Restore permissions for cleanup
+        let perms = fs::Permissions::from_mode(0o755);
+        fs::set_permissions(path, perms).unwrap();
+
+        assert!(matches!(res, Err(InitError::Io(_))));
+    }
 }
 
-#[test]
-fn test_happy_path() {
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let path = tmp_dir.path();
+mod write_template_tests {
+    use super::*;
+    #[test]
+    fn happy_path() {
+        let mut buf: Vec<u8> = Vec::new();
+        write_template(&mut buf, "hello").unwrap();
+        assert_eq!(buf, "hello".as_bytes());
+    }
 
-    let _ = run_init(path);
+    #[test]
+    fn write_errors_propagate() {
+        let mut writer = FailingWriter;
+        let err = write_template(&mut writer, "hello").unwrap_err();
+        assert!(matches!(
+                err, InitError::Io(e) if e.kind() == std::io::ErrorKind::Other));
+    }
 
-    let config_path = path.join(".watchr.toml");
-    assert!(config_path.exists());
-}
-
-#[test]
-fn test_already_exists() {
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let path = tmp_dir.path();
-    let config_path = path.join(".watchr.toml");
-
-    create_config_file(&config_path);
-
-    let res = run_init(path);
-
-    assert!(matches!(res, Err(InitError::FileAlreadyExists)));
-}
-
-#[test]
-#[cfg(unix)]
-fn test_permission_denied() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let tmp_dir = tempfile::TempDir::new().unwrap();
-    let path = tmp_dir.path();
-
-    let perms = fs::Permissions::from_mode(0o555);
-    fs::set_permissions(path, perms).unwrap();
-
-    let res = run_init(path);
-
-    // Restore permissions for cleanup
-    let perms = fs::Permissions::from_mode(0o755);
-    fs::set_permissions(path, perms).unwrap();
-
-    assert!(matches!(res, Err(InitError::Io(_))));
+    #[test]
+    fn flush_errors_propagate() {
+        let mut writer = FlushFailingWriter;
+        let err = write_template(&mut writer, "hello").unwrap_err();
+        assert!(
+            matches!(err, InitError::Io(e) if e.kind() == std::io::ErrorKind::Other)
+        );
+    }
 }

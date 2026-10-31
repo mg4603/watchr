@@ -66,9 +66,15 @@ pub fn run_init(path: &Path) -> Result<(), InitError> {
     }
 
     let mut file = File::create(path)?;
+    write_template(&mut file, DEFAULT_CONFIG_TEMPLATE)
+}
 
-    file.write_all(DEFAULT_CONFIG_TEMPLATE.as_bytes())?;
-    file.flush()?;
+fn write_template<W: Write>(
+    writer: &mut W,
+    template: &str,
+) -> Result<(), InitError> {
+    writer.write_all(template.as_bytes())?;
+    writer.flush()?;
     Ok(())
 }
 
