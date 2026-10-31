@@ -17,6 +17,7 @@ use watchr::config::{ConfigError, prepare_config};
 use watchr::init::{InitError, run_init};
 
 use watchr::tracing::init_tracing;
+use watchr::watcher::shutdown::CtrlCHandler;
 use watchr::watcher::{WatcherError, run_watch};
 
 /// Errors that can occur during `watchr` run.
@@ -78,7 +79,7 @@ fn run(
                 args.config_path().map(|p| p.to_path_buf()),
                 std::env::current_dir()?,
             )?;
-            run_watch(config, writer)?;
+            run_watch(config, writer, CtrlCHandler)?;
         }
     }
     Ok(())

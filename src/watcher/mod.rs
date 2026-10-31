@@ -7,7 +7,7 @@
 mod command;
 mod debounce;
 mod output;
-mod shutdown;
+pub mod shutdown;
 
 use std::sync::mpsc::{Receiver, channel as mpsc_channel};
 
@@ -19,7 +19,7 @@ use crate::config::WatcherConfig;
 use command::{CommandRunner, ShellRunner};
 use debounce::create_debouncers;
 use output::format_output;
-use shutdown::create_shutdown_handler;
+use shutdown::ShutdownHandler;
 
 /// Errors produced during watcher initialization and runtime
 /// setup.
@@ -76,6 +76,7 @@ pub enum WatchEvent {
 /// use watchr::config::WatcherConfig;
 /// use watchr::entry::WatcherEntry;
 /// use watchr::watcher::run_watch;
+/// use watchr::watcher::shutdown::CtrlCHandler;
 /// use std::path::PathBuf;
 ///
 /// let entry = WatcherEntry {
@@ -89,16 +90,17 @@ pub enum WatchEvent {
 ///     entries: vec![entry]
 /// };
 /// let mut stdout = std::io::stdout();
-/// run_watch(config, &mut stdout)?;
+/// run_watch(config, &mut stdout, CtrlCHandler)?;
 /// # Ok::<(), watchr::watcher::WatcherError>(())
 /// ```
-pub fn run_watch(
+pub fn run_watch<S: ShutdownHandler>(
     config: WatcherConfig,
     writer: &mut dyn std::io::Write,
+    shutdown_handler: S,
 ) -> Result<(), WatcherError> {
     let (tx, rx) = mpsc_channel();
 
-    create_shutdown_handler(tx.clone())?;
+    shutdown_handler.install(tx.clone())?;
 
     // NB: debouncers must stay in scope - dropping them cancels
     // pending events and stops the watchers. Do not "simplify" to
