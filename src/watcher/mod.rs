@@ -76,7 +76,7 @@ pub enum WatchEvent {
 /// use watchr::config::WatcherConfig;
 /// use watchr::entry::WatcherEntry;
 /// use watchr::watcher::run_watch;
-/// use watchr::watcher::shutdown::CtrlCHandler;
+/// use watchr::watcher::shutdown::{CtrlCHandler, ShutdownHandler};
 /// use std::path::PathBuf;
 ///
 /// let entry = WatcherEntry {
