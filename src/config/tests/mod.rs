@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use tempfile::{NamedTempFile, TempDir};
 
 mod read_config;
+mod validate_config;
 
 fn write_config(dir: &TempDir, contents: &str) -> std::path::PathBuf {
     let path = dir.path().join(".watchr.toml");
