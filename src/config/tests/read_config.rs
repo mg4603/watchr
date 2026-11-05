@@ -2,7 +2,7 @@ use super::*;
 #[test]
 fn parses_valid_config() {
     let dir = TempDir::new().unwrap();
-    let path = write_config(&dir, &valid_toml());
+    let path = write_config(&dir, valid_toml());
     let config = read_config(&path).unwrap();
 
     assert_eq!(config.debounce_ms, 500);
@@ -10,9 +10,9 @@ fn parses_valid_config() {
 
     let entry = &config.entries[0];
 
-    assert_eq!(entry.name, Some("sample_test".to_string()));
+    assert_eq!(entry.name, Some("test".to_string()));
     assert_eq!(entry.dirs.len(), 1);
-    assert_eq!(entry.command, "pwd");
+    assert_eq!(entry.command, "echo test");
     assert!(entry.ext.is_none());
 }
 
@@ -43,7 +43,7 @@ fn directory_instead_of_file_maps_to_io_error() {
 fn permission_denied_matches_to_io_error() {
     use std::os::unix::fs::PermissionsExt;
     let dir = TempDir::new().unwrap();
-    let path = write_config(&dir, &valid_toml());
+    let path = write_config(&dir, valid_toml());
     fs::set_permissions(&path, fs::Permissions::from_mode(0o000))
         .unwrap();
     let err = read_config(&path).unwrap_err();
@@ -71,7 +71,7 @@ fn malformed_toml_maps_to_deserialize_error() {
 #[test]
 fn wrong_type_maps_to_deserialize_error() {
     let dir = TempDir::new().unwrap();
-    let path = write_config(&dir, &wrong_type_toml());
+    let path = write_config(&dir, wrong_type_toml());
     let err = read_config(&path).unwrap_err();
     assert!(matches!(err, ConfigError::Deserialize(_)));
 }
