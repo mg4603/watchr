@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use tempfile::{NamedTempFile, TempDir};
 
+mod prepare_config;
 mod read_config;
 mod validate_config;
 
@@ -32,6 +33,15 @@ dirs = ["/tmp"]
 command = "pwd"
 "####
         .to_string()
+}
+
+fn entry(dirs: Vec<PathBuf>) -> WatcherEntry {
+    WatcherEntry {
+        name: Some("test".to_string()),
+        dirs,
+        ext: None,
+        command: "echo test".to_string(),
+    }
 }
 
 // ------------ error propagation semantics ---------
