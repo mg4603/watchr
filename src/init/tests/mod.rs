@@ -3,6 +3,7 @@ use super::*;
 use crate::test_helpers::{FailingWriter, FlushFailingWriter};
 
 use std::fs;
+use std::io::Cursor;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -24,11 +25,13 @@ fn io_error_from_conversion() {
 
 #[test]
 fn error_display_messages() {
-    let err = InitError::FileAlreadyExists(PathBuf::from("config.toml"));
+    let path = PathBuf::from("/tmp/config.toml");
+    let err = InitError::FileAlreadyExists(path.clone());
     assert_eq!(
         err.to_string(),
-        "config file already exists: config.toml"
+        format!("config file already exists: {}", path.display())
     );
+    assert!(matches!(err, InitError::FileAlreadyExists(p) if p == path));
 
     let err = InitError::Io(io::Error::other("denied"));
     assert_eq!(err.to_string(), "failed to write config file: denied");
