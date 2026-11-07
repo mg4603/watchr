@@ -67,7 +67,7 @@ pub fn run_init(path: &Path) -> Result<(), InitError> {
 }
 
 fn open_new(config_path: &Path) -> Result<File, InitError> {
-    if config_path.exists() && config_path.is_dir() {
+    if config_path.is_dir() {
         return Err(InitError::Io(io::Error::new(
             io::ErrorKind::InvalidInput,
             "path is a directory",
