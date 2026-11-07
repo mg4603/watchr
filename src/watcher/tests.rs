@@ -72,7 +72,7 @@ mod run_event_loop_tests {
     #[test]
     fn writeln_error_command_arm() {
         let (tx, rx) = mpsc_channel();
-        let mut writer = FailingWriter;
+        let mut writer = FailingWriter { remaining: 4 };
         let runner = FakeRunner {
             status: 0,
             stdout: b"hello".to_vec(),
@@ -94,7 +94,7 @@ mod run_event_loop_tests {
     #[test]
     fn writeln_error_shutdown_arm() {
         let (tx, rx) = mpsc_channel();
-        let mut writer = FailingWriter;
+        let mut writer = FailingWriter { remaining: 4 };
         let runner = FakeRunner {
             status: 0,
             stdout: b"hello".to_vec(),

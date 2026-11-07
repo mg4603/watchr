@@ -1,10 +1,18 @@
 #[cfg(test)]
-use std::io::{Error, Result, Write};
+use std::io::{self, Result, Write};
 
-pub(crate) struct FailingWriter;
+pub(crate) struct FailingWriter {
+    pub(crate) remaining: usize,
+}
+
 impl Write for FailingWriter {
-    fn write(&mut self, _buf: &[u8]) -> Result<usize> {
-        Err(Error::other("write failed"))
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        if buf.len() > self.remaining {
+            Err(io::Error::other("write failed"))
+        } else {
+            self.remaining -= buf.len();
+            Ok(buf.len())
+        }
     }
     fn flush(&mut self) -> Result<()> {
         Ok(())
@@ -17,6 +25,6 @@ impl Write for FlushFailingWriter {
         Ok(buf.len())
     }
     fn flush(&mut self) -> Result<()> {
-        Err(Error::other("flush failed"))
+        Err(io::Error::other("flush failed"))
     }
 }
