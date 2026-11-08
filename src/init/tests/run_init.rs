@@ -1,33 +1,35 @@
-
 use super::*;
 
 #[test]
-fn happy_path() {
-    let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path();
+fn writes_default_template_to_config_file_in_path() {
+    let dir = TempDir::new().unwrap();
+    let result = run_init(dir.path());
+    assert!(result.is_ok());
 
-    let _ = run_init(path);
-
-    let config_path = path.join(".watchr.toml");
-    assert!(config_path.exists());
+    let config_path = dir.path().join(CONFIG_FILE_NAME);
+    assert!(config_path.is_file());
+    let contents = fs::read_to_string(&config_path).unwrap();
+    assert_eq!(contents, DEFAULT_CONFIG_TEMPLATE);
 }
 
 #[test]
-#[cfg(unix)]
-fn permission_denied() {
-    use std::os::unix::fs::PermissionsExt;
+fn refuses_to_overwrite_existing_config() {
+    let dir = TempDir::new().unwrap();
+    let config_path = dir.path().join(CONFIG_FILE_NAME);
+    let sentinel = "sentinel data\n";
+    fs::write(&config_path, sentinel).unwrap();
 
-    let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path();
+    let err = run_init(dir.path()).unwrap_err();
+    assert!(
+        matches!(err, InitError::FileAlreadyExists(p) if p == config_path),
+    );
+    assert_eq!(fs::read_to_string(&config_path).unwrap(), sentinel);
+}
 
-    let perms = fs::Permissions::from_mode(0o555);
-    fs::set_permissions(path, perms).unwrap();
+#[test]
+fn propagates_creation_failure() {
+    let dir = TempDir::new().unwrap();
+    let missing_parent = dir.path().join("no/such/dir");
 
-    let res = run_init(path);
-
-    // Restore permissions for cleanup
-    let perms = fs::Permissions::from_mode(0o755);
-    fs::set_permissions(path, perms).unwrap();
-
-    assert!(matches!(res, Err(InitError::Io(_))));
+    assert!(run_init(&missing_parent).is_err());
 }
