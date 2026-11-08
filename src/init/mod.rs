@@ -3,7 +3,7 @@
 //! Creates a commented config file with example watcher
 //! entries. See [`InitError`] for failure conditions
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use thiserror::Error;
@@ -62,8 +62,9 @@ debounce_ms = 500
 /// ```
 pub fn run_init(path: &Path) -> Result<(), InitError> {
     let config_path = path.join(CONFIG_FILE_NAME);
-    let mut file = open_new(&config_path)?;
-    write_template(&mut file, DEFAULT_CONFIG_TEMPLATE)
+    let file = open_new(&config_path)?;
+    let mut writer = BufWriter::new(file);
+    write_template(&mut writer, DEFAULT_CONFIG_TEMPLATE)
 }
 
 fn open_new(config_path: &Path) -> Result<File, InitError> {
