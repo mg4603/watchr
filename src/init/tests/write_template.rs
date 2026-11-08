@@ -65,3 +65,25 @@ fn returns_io_error_when_flush_fails() {
         other => panic!("expected Io error, got: {other:?}"),
     }
 }
+
+// force buffer overflow to make write_all fail
+#[cfg(target_os = "linux")]
+#[test]
+fn write_template_bufwriter_write_failure() {
+    let file = fs::File::create("/dev/full").unwrap();
+    let mut writer = BufWriter::with_capacity(1, file);
+    let err =
+        write_template(&mut writer, DEFAULT_CONFIG_TEMPLATE).unwrap_err();
+    assert!(matches!(err, InitError::Io(_)))
+}
+
+// template fits in buffer so write_all succeeds and the error surfaces at flush
+#[cfg(target_os = "linux")]
+#[test]
+fn write_template_bufwriter_flush_failure() {
+    let file = fs::File::create("/dev/full").unwrap();
+    let mut writer = BufWriter::new(file);
+    let err =
+        write_template(&mut writer, DEFAULT_CONFIG_TEMPLATE).unwrap_err();
+    assert!(matches!(err, InitError::Io(_)))
+}
