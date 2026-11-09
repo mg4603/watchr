@@ -179,7 +179,7 @@ fn check_extensions(
     extensions_to_filter: Option<&[String]>,
 ) -> bool {
     match extensions_to_filter {
-        None => true,
+        None | Some([]) => true,
         Some(extensions) => extensions.iter().any(|ext| {
             path.extension()
                 .and_then(|os_str| os_str.to_str())
