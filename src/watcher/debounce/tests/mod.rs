@@ -18,6 +18,7 @@ mod check_extensions;
 mod debounced_events_result_handler;
 mod handle_events;
 mod has_matching_event;
+mod log_errors;
 mod send_command;
 
 fn event_kind(kind: &str) -> EventKind {
