@@ -3,7 +3,8 @@ use super::*;
 use notify_debouncer_full::DebouncedEvent;
 use notify_debouncer_full::notify;
 use notify_debouncer_full::notify::event::{
-    AccessKind, CreateKind, Event, EventKind, ModifyKind, RemoveKind,
+    AccessKind, AccessMode, CreateKind, DataChange, Event, EventKind,
+    MetadataKind, ModifyKind, RemoveKind, RenameMode,
 };
 
 use std::fs;
@@ -24,6 +25,7 @@ fn event_kind(kind: &str) -> EventKind {
         "access" => EventKind::Access(AccessKind::Any),
         "create" => EventKind::Create(CreateKind::Any),
         "remove" => EventKind::Remove(RemoveKind::Any),
+        "other" => EventKind::Other,
         _ => EventKind::Modify(ModifyKind::Any), //default
     }
 }
@@ -55,10 +57,24 @@ fn create_debounced_event_result(
 
 #[test]
 fn test_is_mutation() {
-    assert!(!is_mutation(&event_kind("access")));
-    assert!(is_mutation(&event_kind("create")));
-    assert!(is_mutation(&event_kind("remove")));
-    assert!(is_mutation(&event_kind("modify")));
+    let cases = [
+        (EventKind::Create(CreateKind::File), true),
+        (EventKind::Create(CreateKind::Folder), true),
+        (EventKind::Modify(ModifyKind::Data(DataChange::Any)), true),
+        (
+            EventKind::Modify(ModifyKind::Metadata(MetadataKind::Any)),
+            true,
+        ),
+        (EventKind::Modify(ModifyKind::Name(RenameMode::Any)), true),
+        (EventKind::Remove(RemoveKind::File), true),
+        (EventKind::Remove(RemoveKind::Folder), true),
+        (EventKind::Access(AccessKind::Read), false),
+        (EventKind::Access(AccessKind::Close(AccessMode::Write)), false),
+        (EventKind::Other, false),
+    ];
+    for (kind, expected) in cases {
+        assert_eq!(is_mutation(&kind), expected, "failed for {kind:?}");
+    }
 }
 
 #[test]
