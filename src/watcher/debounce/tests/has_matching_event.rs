@@ -10,13 +10,12 @@ fn test_has_matching_event_no_match() {
     fs::write(&file_2, "test").unwrap();
 
     let events = vec![
-        create_debounced_event("access", &file_1.display().to_string()),
-        create_debounced_event("modify", &file_2.display().to_string()),
+        create_debounced_event("access", &[file_1.to_str().unwrap()]),
+        create_debounced_event("modify", &[file_2.to_str().unwrap()]),
     ];
 
     let exts = vec!["rs".to_string()];
     assert!(!has_matching_event(&events, Some(&exts)));
-
     assert!(logs_contain("file_access"));
     assert!(logs_contain("readme.md"));
 }
@@ -33,9 +32,9 @@ fn test_has_matching_event_with_short_circuit() {
     fs::write(&file_3, "test").unwrap();
 
     let events = vec![
-        create_debounced_event("access", &file_1.display().to_string()),
-        create_debounced_event("create", &file_2.display().to_string()),
-        create_debounced_event("remove", &file_3.display().to_string()),
+        create_debounced_event("access", &[file_1.to_str().unwrap()]),
+        create_debounced_event("create", &[file_2.to_str().unwrap()]),
+        create_debounced_event("remove", &[file_3.to_str().unwrap()]),
     ];
     let exts = vec!["rs".to_string()];
     assert!(has_matching_event(&events, Some(&exts)));

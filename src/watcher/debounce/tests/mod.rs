@@ -19,6 +19,7 @@ mod debounced_events_result_handler;
 mod handle_events;
 mod has_matching_event;
 mod log_errors;
+mod log_event;
 mod send_command;
 
 fn event_kind(kind: &str) -> EventKind {
@@ -31,11 +32,11 @@ fn event_kind(kind: &str) -> EventKind {
     }
 }
 
-fn create_debounced_event(kind: &str, path: &str) -> DebouncedEvent {
+fn create_debounced_event(kind: &str, paths: &[&str]) -> DebouncedEvent {
     DebouncedEvent {
         event: Event {
             kind: event_kind(kind),
-            paths: vec![PathBuf::from(path)],
+            paths: paths.iter().map(|p| PathBuf::from(*p)).collect(),
             attrs: Default::default(),
         },
         time: Instant::now(),
@@ -53,7 +54,7 @@ fn create_debounced_event_result(
         }]);
     }
 
-    Ok(vec![create_debounced_event(kind, "src/main.rs")])
+    Ok(vec![create_debounced_event(kind, &["src/main.rs"])])
 }
 
 #[test]
@@ -81,7 +82,7 @@ fn test_is_mutation() {
 #[test]
 #[traced_test]
 fn test_log_event_covers_debug_fields() {
-    let event = create_debounced_event("access", "main.rs");
+    let event = create_debounced_event("access", &["main.rs"]);
     log_event(&event);
     assert!(logs_contain("event detail"));
 }
