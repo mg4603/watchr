@@ -3,11 +3,8 @@ use super::*;
 #[test]
 #[traced_test]
 fn test_has_matching_event_no_match() {
-    let tmp_dir = TempDir::new().unwrap();
-    let file_1 = tmp_dir.path().join("file_access.txt");
-    fs::write(&file_1, "test").unwrap();
-    let file_2 = tmp_dir.path().join("readme.md");
-    fs::write(&file_2, "test").unwrap();
+    let (file_1, _tmp_dir) = create_temp_file("file_access.txt", "test");
+    let (file_2, _tmp_dir) = create_temp_file("readme.md", "test");
 
     let events = vec![
         create_debounced_event("access", &[file_1.to_str().unwrap()]),
@@ -23,13 +20,9 @@ fn test_has_matching_event_no_match() {
 #[test]
 #[traced_test]
 fn test_has_matching_event_with_short_circuit() {
-    let tmp_dir = TempDir::new().unwrap();
-    let file_1 = tmp_dir.path().join("file_access.txt");
-    fs::write(&file_1, "test").unwrap();
-    let file_2 = tmp_dir.path().join("file_a.rs");
-    fs::write(&file_2, "test").unwrap();
-    let file_3 = tmp_dir.path().join("file_b.rs");
-    fs::write(&file_3, "test").unwrap();
+    let (file_1, _tmp_dir) = create_temp_file("file_access.txt", "test");
+    let (file_2, _tmp_dir) = create_temp_file("file_a.rs", "test");
+    let (file_3, _tmp_dir) = create_temp_file("file_b.rs", "test");
 
     let events = vec![
         create_debounced_event("access", &[file_1.to_str().unwrap()]),

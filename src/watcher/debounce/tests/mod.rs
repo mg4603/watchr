@@ -22,6 +22,14 @@ mod log_errors;
 mod log_event;
 mod send_command;
 
+fn create_temp_file(filename: &str, content: &str) -> (PathBuf, TempDir) {
+    let tmp_dir = TempDir::new().unwrap();
+    let file = tmp_dir.path().join(filename);
+    fs::write(&file, content).unwrap();
+
+    (file, tmp_dir)
+}
+
 fn event_kind(kind: &str) -> EventKind {
     match kind {
         "access" => EventKind::Access(AccessKind::Any),
