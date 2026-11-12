@@ -10,8 +10,10 @@ use notify_debouncer_full::notify::event::{
 use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::channel as mpsc_channel;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tempfile::TempDir;
+use tracing_subscriber::layer::SubscriberExt;
 use tracing_test::traced_test;
 
 mod check_extensions;
@@ -63,6 +65,21 @@ fn create_debounced_event_result(
     }
 
     Ok(vec![create_debounced_event(kind, &["src/main.rs"])])
+}
+
+#[derive(Clone)]
+struct LevelRecorder(Arc<Mutex<Vec<tracing::Level>>>);
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S>
+    for LevelRecorder
+{
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        self.0.lock().unwrap().push(*event.metadata().level());
+    }
 }
 
 #[test]
