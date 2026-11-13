@@ -149,8 +149,10 @@ fn send_command(
     command: String,
     name: Option<String>,
 ) {
-    tracing::debug!(command = %command, "sending command event");
-    let _ = tx.send(WatchEvent::Command { cmd: command, name });
+    tracing::debug!(command = %command, "sending Command event");
+    if tx.send(WatchEvent::Command { cmd: command, name }).is_err() {
+        tracing::warn!("receiver dropped, failed to send Command event");
+    }
 }
 
 fn log_errors<E: std::fmt::Display>(errors: impl IntoIterator<Item = E>) {
