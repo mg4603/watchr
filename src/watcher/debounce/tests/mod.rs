@@ -56,18 +56,11 @@ fn create_debounced_event(
     }
 }
 
-fn create_debounced_event_result(
-    error: bool,
-    kind: &str,
-) -> DebounceEventResult {
-    if error {
-        return Err(vec![notify::Error {
-            kind: notify::ErrorKind::Generic("custom".to_string()),
-            paths: vec![PathBuf::from("./")],
-        }]);
-    }
-    let paths = vec![PathBuf::from("src/main.rs")];
-    Ok(vec![create_debounced_event(kind, paths)])
+fn create_error_debounce_event_result() -> DebounceEventResult {
+    Err(vec![notify::Error {
+        kind: notify::ErrorKind::Generic("custom".to_string()),
+        paths: vec![PathBuf::from("./")],
+    }])
 }
 
 #[derive(Clone)]

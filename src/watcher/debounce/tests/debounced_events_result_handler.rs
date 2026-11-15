@@ -11,7 +11,8 @@ fn test_debounced_events_result_handler() {
         tx,
     );
 
-    let result = create_debounced_event_result(false, "modify");
+    let (file, _tmp) = create_temp_file("file.txt", "test");
+    let result = Ok(vec![create_debounced_event("modify", vec![file])]);
     handler(result);
 
     assert!(matches!(rx.try_recv(), Ok(WatchEvent::Command { .. })))
