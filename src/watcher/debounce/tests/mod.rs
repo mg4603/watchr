@@ -49,7 +49,7 @@ fn create_debounced_event(
     DebouncedEvent {
         event: Event {
             kind: event_kind(kind),
-            paths: paths,
+            paths,
             attrs: Default::default(),
         },
         time: Instant::now(),
