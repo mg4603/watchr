@@ -107,14 +107,28 @@ fn test_is_relevant_path() {
     let matching_file = tmp.path().join("main.rs");
     let non_matching_file = tmp.path().join("test.txt");
     let dir = tmp.path().join("directory");
+    let removed_file = tmp.path().join("removed.rs");
 
     fs::write(&matching_file, "fn main() {}").unwrap();
     fs::write(&non_matching_file, "test").unwrap();
     fs::create_dir(&dir).unwrap();
+    fs::write(&removed_file, "fn main() {}").unwrap();
+    fs::remove_file(&removed_file).unwrap();
 
     let exts = vec!["rs".to_string()];
 
-    assert!(!is_relevant_path(&dir, Some(&exts)));
-    assert!(!is_relevant_path(&non_matching_file, Some(&exts)));
-    assert!(is_relevant_path(&matching_file, Some(&exts)));
+    // Directories aren't relevant
+    assert!(!is_relevant_path(&dir, Some(&exts), false));
+    // Non-matching extensions aren't relevant
+    assert!(!is_relevant_path(&non_matching_file, Some(&exts), false));
+    // Existing matching files are relevant
+    assert!(is_relevant_path(&matching_file, Some(&exts), false));
+    // Removed matching files remain relevant
+    assert!(is_relevant_path(&removed_file, Some(&exts), true));
+    // Removed files still respect extension filtering
+    assert!(!is_relevant_path(
+        &removed_file,
+        Some(&["txt".to_string()]),
+        true
+    ));
 }

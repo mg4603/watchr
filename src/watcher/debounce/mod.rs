@@ -130,8 +130,12 @@ pub(super) fn handle_events(
     }
 }
 
-fn is_relevant_path(path: &Path, exts: Option<&[String]>) -> bool {
-    path.is_file() && check_extensions(path, exts)
+fn is_relevant_path(
+    path: &Path,
+    exts: Option<&[String]>,
+    is_remove: bool,
+) -> bool {
+    (is_remove || path.is_file()) && check_extensions(path, exts)
 }
 
 fn has_matching_event(
@@ -139,8 +143,13 @@ fn has_matching_event(
     exts: Option<&[String]>,
 ) -> bool {
     events.iter().inspect(|event| log_event(event)).any(|event| {
+        let is_remove = matches!(event.event.kind, EventKind::Remove(_));
+
         is_mutation(&event.event.kind)
-            && event.paths.iter().any(|path| is_relevant_path(path, exts))
+            && event
+                .paths
+                .iter()
+                .any(|path| is_relevant_path(path, exts, is_remove))
     })
 }
 
