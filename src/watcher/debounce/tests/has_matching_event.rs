@@ -8,9 +8,9 @@ fn short_circuit() {
     let (file_3, _tmp_dir) = create_temp_file("file_b.rs", "test");
 
     let events = vec![
-        create_debounced_event("access", &[file_1.to_str().unwrap()]),
-        create_debounced_event("create", &[file_2.to_str().unwrap()]),
-        create_debounced_event("remove", &[file_3.to_str().unwrap()]),
+        create_debounced_event("access", vec![file_1]),
+        create_debounced_event("create", vec![file_2]),
+        create_debounced_event("remove", vec![file_3]),
     ];
     let exts = vec!["rs".to_string()];
     assert!(has_matching_event(&events, Some(&exts)));
@@ -26,10 +26,8 @@ fn matches_when_any_path_relevant() {
     let (file_1, _tmp_dir) = create_temp_file("notes.txt", "test");
     let (file_2, _tmp_dir) = create_temp_file("main.rs", "fn main(){}");
 
-    let events = vec![create_debounced_event(
-        "modify",
-        &[file_1.to_str().unwrap(), file_2.to_str().unwrap()],
-    )];
+    let events =
+        vec![create_debounced_event("modify", vec![file_1, file_2])];
     let exts = vec!["rs".to_string()];
     assert!(has_matching_event(&events, Some(&exts)));
     assert!(logs_contain("notes.txt"));
@@ -40,8 +38,7 @@ fn matches_when_any_path_relevant() {
 #[traced_test]
 fn mutation_but_filtered_extension() {
     let (file, _tmp_dir) = create_temp_file("notes.txt", "test");
-    let events =
-        vec![create_debounced_event("modify", &[file.to_str().unwrap()])];
+    let events = vec![create_debounced_event("modify", vec![file])];
     let exts = vec!["rs".to_string()];
     assert!(!has_matching_event(&events, Some(&exts)));
     assert!(logs_contain("notes.txt"));
@@ -51,8 +48,7 @@ fn mutation_but_filtered_extension() {
 #[traced_test]
 fn not_mutation_matching_extension() {
     let (file, _tmp_dir) = create_temp_file("notes.txt", "test");
-    let events =
-        vec![create_debounced_event("access", &[file.to_str().unwrap()])];
+    let events = vec![create_debounced_event("access", vec![file])];
     let exts = vec!["txt".to_string()];
     assert!(!has_matching_event(&events, Some(&exts)));
     assert!(logs_contain("notes.txt"));
@@ -65,8 +61,8 @@ fn mixed_events_no_match() {
     let (file_2, _tmp_dir) = create_temp_file("notes.txt", "test");
 
     let events = vec![
-        create_debounced_event("access", &[file_1.to_str().unwrap()]),
-        create_debounced_event("modify", &[file_2.to_str().unwrap()]),
+        create_debounced_event("access", vec![file_1]),
+        create_debounced_event("modify", vec![file_2]),
     ];
 
     let exts = vec!["rs".to_string()];

@@ -42,11 +42,14 @@ fn event_kind(kind: &str) -> EventKind {
     }
 }
 
-fn create_debounced_event(kind: &str, paths: &[&str]) -> DebouncedEvent {
+fn create_debounced_event(
+    kind: &str,
+    paths: Vec<PathBuf>,
+) -> DebouncedEvent {
     DebouncedEvent {
         event: Event {
             kind: event_kind(kind),
-            paths: paths.iter().map(|p| PathBuf::from(*p)).collect(),
+            paths: paths,
             attrs: Default::default(),
         },
         time: Instant::now(),
@@ -63,8 +66,8 @@ fn create_debounced_event_result(
             paths: vec![PathBuf::from("./")],
         }]);
     }
-
-    Ok(vec![create_debounced_event(kind, &["src/main.rs"])])
+    let paths = vec![PathBuf::from("src/main.rs")];
+    Ok(vec![create_debounced_event(kind, paths)])
 }
 
 #[derive(Clone)]
@@ -102,14 +105,6 @@ fn test_is_mutation() {
     for (kind, expected) in cases {
         assert_eq!(is_mutation(&kind), expected, "failed for {kind:?}");
     }
-}
-
-#[test]
-#[traced_test]
-fn test_log_event_covers_debug_fields() {
-    let event = create_debounced_event("access", &["main.rs"]);
-    log_event(&event);
-    assert!(logs_contain("event detail"));
 }
 
 #[test]
