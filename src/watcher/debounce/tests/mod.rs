@@ -111,3 +111,22 @@ fn test_log_event_covers_debug_fields() {
     log_event(&event);
     assert!(logs_contain("event detail"));
 }
+
+#[test]
+fn test_is_relevant_path() {
+    let tmp = TempDir::new().unwrap();
+
+    let matching_file = tmp.path().join("main.rs");
+    let non_matching_file = tmp.path().join("test.txt");
+    let dir = tmp.path().join("directory");
+
+    fs::write(&matching_file, "fn main() {}").unwrap();
+    fs::write(&non_matching_file, "test").unwrap();
+    fs::create_dir(&dir).unwrap();
+
+    let exts = vec!["rs".to_string()];
+
+    assert!(!is_relevant_path(&dir, Some(&exts)));
+    assert!(!is_relevant_path(&non_matching_file, Some(&exts)));
+    assert!(is_relevant_path(&matching_file, Some(&exts)));
+}
