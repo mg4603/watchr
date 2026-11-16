@@ -9,6 +9,7 @@ mod debounce;
 mod output;
 pub mod shutdown;
 
+use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, channel as mpsc_channel};
 
 use notify_debouncer_full::notify;
@@ -25,6 +26,14 @@ use shutdown::ShutdownHandler;
 /// setup.
 #[derive(Error, Debug)]
 pub enum WatcherError {
+    /// Failed to watch a directory.
+    #[error("failed to watch `{path}`: {source}")]
+    Watch {
+        path: PathBuf,
+        #[source]
+        source: notify::Error,
+    },
+
     /// Debouncer creation or watch registration failure from
     /// the notify layer.
     #[error("notify-debouncer error: {0}")]
