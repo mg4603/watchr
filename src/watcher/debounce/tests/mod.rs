@@ -23,6 +23,7 @@ mod has_matching_event;
 mod log_errors;
 mod log_event;
 mod send_command;
+mod watch_dirs;
 
 fn create_temp_file(filename: &str, content: &str) -> (PathBuf, TempDir) {
     let tmp_dir = TempDir::new().unwrap();
