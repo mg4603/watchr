@@ -17,6 +17,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_test::traced_test;
 
 mod check_extensions;
+mod create_debouncer_for_entry;
 mod debounced_events_result_handler;
 mod handle_events;
 mod has_matching_event;
