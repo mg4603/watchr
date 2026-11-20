@@ -3,7 +3,7 @@ use super::*;
 use crate::test_helpers::FailingWriter;
 
 #[cfg(unix)]
-mod run_event_loop_tests {
+mod run_event_loop {
     use super::*;
 
     use crate::watcher::command::tests::FakeRunner;
@@ -22,10 +22,12 @@ mod run_event_loop_tests {
         tx.send(WatchEvent::Shutdown).unwrap();
         drop(tx);
 
-        let _ = run_event_loop(rx, &runner, &mut output);
+        let result = run_event_loop(rx, &runner, &mut output);
 
-        let result = String::from_utf8(output).unwrap();
-        assert!(result.contains("Shutting down gracefully..."));
+        assert!(result.is_ok());
+
+        let output = String::from_utf8(output).unwrap();
+        assert_eq!(output, "Shutting down gracefully...\n");
     }
 
     #[test]
@@ -39,9 +41,10 @@ mod run_event_loop_tests {
         };
         drop(tx);
 
-        let _ = run_event_loop(rx, &runner, &mut output);
+        let err = run_event_loop(rx, &runner, &mut output).unwrap_err();
 
-        assert!(String::from_utf8(output).unwrap().is_empty());
+        assert!(matches!(err, WatcherError::ChannelDisconnected));
+        assert!(output.is_empty());
     }
 
     #[test]
@@ -62,11 +65,13 @@ mod run_event_loop_tests {
         tx.send(WatchEvent::Shutdown).unwrap();
         drop(tx);
 
-        let _ = run_event_loop(rx, &runner, &mut output);
+        let result = run_event_loop(rx, &runner, &mut output);
+        assert!(result.is_ok());
 
-        let result = String::from_utf8(output).unwrap();
-        assert!(result.contains("$ echo hello"));
-        assert!(result.contains("✓ success"));
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.contains("$ echo hello"));
+        assert!(output.contains("✓ success"));
+        assert!(output.contains("Shutting down gracefully..."));
     }
 
     #[test]
@@ -87,8 +92,8 @@ mod run_event_loop_tests {
         tx.send(WatchEvent::Shutdown).unwrap();
         drop(tx);
 
-        let result = run_event_loop(rx, &runner, &mut writer);
-        assert!(matches!(result, Err(WatcherError::WriteError(_))));
+        let err = run_event_loop(rx, &runner, &mut writer).unwrap_err();
+        assert!(matches!(err, WatcherError::WriteError(_)));
     }
 
     #[test]
@@ -104,7 +109,7 @@ mod run_event_loop_tests {
         tx.send(WatchEvent::Shutdown).unwrap();
         drop(tx);
 
-        let result = run_event_loop(rx, &runner, &mut writer);
-        assert!(matches!(result, Err(WatcherError::WriteError(_))));
+        let err = run_event_loop(rx, &runner, &mut writer).unwrap_err();
+        assert!(matches!(err, WatcherError::WriteError(_)));
     }
 }
