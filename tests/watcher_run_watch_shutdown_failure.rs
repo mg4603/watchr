@@ -22,7 +22,7 @@ fn handler_registration_failure() {
     };
     let config = WatcherConfig { debounce_ms: 500, entries: vec![entry] };
     let mut stdout = Vec::new();
-    let err = run_watch(config, &mut stdout, CtrlCHandler).unwrap_err();
+    let err = run_watch(config, &mut stdout, &CtrlCHandler).unwrap_err();
 
     assert!(matches!(err, WatcherError::SignalHandler(_)));
 }

@@ -99,13 +99,13 @@ pub enum WatchEvent {
 ///     entries: vec![entry]
 /// };
 /// let mut stdout = std::io::stdout();
-/// run_watch(config, &mut stdout, CtrlCHandler)?;
+/// run_watch(config, &mut stdout, &CtrlCHandler)?;
 /// # Ok::<(), watchr::watcher::WatcherError>(())
 /// ```
-pub fn run_watch<S: ShutdownHandler>(
+pub fn run_watch(
     config: WatcherConfig,
     writer: &mut dyn std::io::Write,
-    shutdown_handler: S,
+    shutdown_handler: &dyn ShutdownHandler,
 ) -> Result<(), WatcherError> {
     let (tx, rx) = mpsc_channel();
 

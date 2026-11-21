@@ -79,7 +79,7 @@ fn run(
                 args.config_path().map(|p| p.to_path_buf()),
                 std::env::current_dir()?,
             )?;
-            run_watch(config, writer, CtrlCHandler)?;
+            run_watch(config, writer, &CtrlCHandler)?;
         }
     }
     Ok(())

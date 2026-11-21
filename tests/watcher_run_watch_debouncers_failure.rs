@@ -17,6 +17,6 @@ fn create_debouncers_failure() {
     };
     let config = WatcherConfig { debounce_ms: 500, entries: vec![entry] };
     let mut writer = Vec::new();
-    let err = run_watch(config, &mut writer, CtrlCHandler).unwrap_err();
+    let err = run_watch(config, &mut writer, &CtrlCHandler).unwrap_err();
     assert!(matches!(err, WatcherError::Watch { .. }));
 }

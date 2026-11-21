@@ -32,7 +32,7 @@ fn run_event_loop_failure() {
 
     let handle = std::thread::spawn(move || {
         let mut writer = FailingWriter;
-        run_watch(config, &mut writer, CtrlCHandler)
+        run_watch(config, &mut writer, &CtrlCHandler)
     });
 
     std::thread::sleep(std::time::Duration::from_millis(200));
