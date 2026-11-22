@@ -16,7 +16,7 @@ use watcher::{WatcherError, run_watch};
 
 /// Errors that can occur during `watchr` run.
 #[derive(Error, Debug)]
-pub enum MainError {
+pub enum AppError {
     /// CLI parsing or validation failed.
     #[error("CliError: {0}")]
     CliError(#[from] CliError),
@@ -51,7 +51,7 @@ pub enum MainError {
 pub fn run(
     cli: Cli,
     writer: &mut dyn std::io::Write,
-) -> Result<(), MainError> {
+) -> Result<(), AppError> {
     match cli.command {
         Commands::Init => {
             run_init(&std::env::current_dir()?)?;
