@@ -14,12 +14,15 @@ use clap::Parser;
 use watchr::cli::Cli;
 use watchr::run;
 use watchr::tracing::init_tracing;
+use watchr::watcher::shutdown::CtrlCHandler;
 
 fn main() {
     let cli = Cli::parse();
     init_tracing(cli.verbose);
     let mut stdout = std::io::stdout();
-    if let Err(e) = run(cli, &mut stdout) {
+    let cwd =
+        std::env::current_dir().expect("error retrieving current dir.");
+    if let Err(e) = run(cli, cwd, &CtrlCHandler, &mut stdout) {
         eprintln!("Error: {e}");
         std::process::exit(1);
     }

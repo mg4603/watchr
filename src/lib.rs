@@ -6,12 +6,13 @@ pub mod resolver;
 pub mod tracing;
 pub mod watcher;
 
+use std::path::PathBuf;
 use thiserror::Error;
 
 use cli::{Cli, CliError, Commands};
 use config::{ConfigError, prepare_config};
 use init::{InitError, run_init};
-use watcher::shutdown::CtrlCHandler;
+use watcher::shutdown::ShutdownHandler;
 use watcher::{WatcherError, run_watch};
 
 /// Errors that can occur during `watchr` run.
@@ -50,20 +51,22 @@ pub enum AppError {
 /// - a watched directory does not exist
 pub fn run(
     cli: Cli,
+    cwd: PathBuf,
+    shutdown_handler: &dyn ShutdownHandler,
     writer: &mut dyn std::io::Write,
 ) -> Result<(), AppError> {
     match cli.command {
         Commands::Init => {
-            run_init(&std::env::current_dir()?)?;
+            run_init(&cwd)?;
             writeln!(writer, ".watchr.toml created").ok();
         }
         Commands::Watch(args) => {
             let config = prepare_config(
                 args.to_entry()?,
                 args.config_path().map(|p| p.to_path_buf()),
-                std::env::current_dir()?,
+                cwd,
             )?;
-            run_watch(config, writer, &CtrlCHandler)?;
+            run_watch(config, writer, shutdown_handler)?;
         }
     }
     Ok(())
@@ -71,3 +74,5 @@ pub fn run(
 
 #[cfg(test)]
 mod test_helpers;
+#[cfg(test)]
+mod tests;
