@@ -61,11 +61,10 @@ pub fn run(
             writeln!(writer, ".watchr.toml created").ok();
         }
         Commands::Watch(args) => {
-            let config = prepare_config(
-                args.to_entry()?,
-                args.config_path().map(|p| p.to_path_buf()),
-                cwd,
-            )?;
+            let entry = args.to_entry()?;
+            let config_path = args.config_path().map(|p| p.to_path_buf());
+            let config = prepare_config(entry, config_path, cwd)?;
+
             run_watch(config, writer, shutdown_handler)?;
         }
     }
