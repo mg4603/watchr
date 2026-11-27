@@ -4,10 +4,12 @@
 //! and dispatches commands when matching file changes occur.
 //!
 //! See [`WatcherError`] for failure modes.
+mod command;
 mod debounce;
 mod output;
-mod shutdown;
+pub mod shutdown;
 
+use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, channel as mpsc_channel};
 
 use notify_debouncer_full::notify;
@@ -15,14 +17,23 @@ use thiserror::Error;
 
 use crate::config::WatcherConfig;
 
+use command::{CommandRunner, ShellRunner};
 use debounce::create_debouncers;
 use output::format_output;
-use shutdown::create_shutdown_handler;
+use shutdown::ShutdownHandler;
 
 /// Errors produced during watcher initialization and runtime
 /// setup.
 #[derive(Error, Debug)]
 pub enum WatcherError {
+    /// Failed to watch a directory.
+    #[error("failed to watch `{path}`: {source}")]
+    Watch {
+        path: PathBuf,
+        #[source]
+        source: notify::Error,
+    },
+
     /// Debouncer creation or watch registration failure from
     /// the notify layer.
     #[error("notify-debouncer error: {0}")]
@@ -74,6 +85,7 @@ pub enum WatchEvent {
 /// use watchr::config::WatcherConfig;
 /// use watchr::entry::WatcherEntry;
 /// use watchr::watcher::run_watch;
+/// use watchr::watcher::shutdown::{CtrlCHandler, ShutdownHandler};
 /// use std::path::PathBuf;
 ///
 /// let entry = WatcherEntry {
@@ -87,16 +99,17 @@ pub enum WatchEvent {
 ///     entries: vec![entry]
 /// };
 /// let mut stdout = std::io::stdout();
-/// run_watch(config, &mut stdout)?;
+/// run_watch(config, &mut stdout, &CtrlCHandler)?;
 /// # Ok::<(), watchr::watcher::WatcherError>(())
 /// ```
 pub fn run_watch(
     config: WatcherConfig,
     writer: &mut dyn std::io::Write,
+    shutdown_handler: &dyn ShutdownHandler,
 ) -> Result<(), WatcherError> {
     let (tx, rx) = mpsc_channel();
 
-    create_shutdown_handler(tx.clone())?;
+    shutdown_handler.install(tx.clone())?;
 
     // NB: debouncers must stay in scope - dropping them cancels
     // pending events and stops the watchers. Do not "simplify" to
@@ -104,18 +117,20 @@ pub fn run_watch(
     let _watch_handles =
         create_debouncers(config.debounce_ms, config.entries, tx)?;
 
-    run_event_loop(rx, writer)?;
+    let runner = ShellRunner;
+    run_event_loop(rx, &runner, writer)?;
     Ok(())
 }
 
-fn run_event_loop(
+fn run_event_loop<R: CommandRunner>(
     rx: Receiver<WatchEvent>,
+    runner: &R,
     writer: &mut dyn std::io::Write,
 ) -> Result<(), WatcherError> {
     loop {
         match rx.recv() {
             Ok(WatchEvent::Command { cmd, name }) => {
-                let output = execute_command(&cmd);
+                let output = runner.run(&cmd);
 
                 let formatted =
                     format_output(&cmd, name.as_deref(), output);
@@ -132,10 +147,6 @@ fn run_event_loop(
             }
         }
     }
-}
-
-fn execute_command(cmd: &str) -> std::io::Result<std::process::Output> {
-    std::process::Command::new("sh").arg("-c").arg(cmd).output()
 }
 
 #[cfg(test)]

@@ -3,7 +3,9 @@
 use super::{WatchEvent, WatcherError};
 use crate::entry::WatcherEntry;
 use notify_debouncer_full::notify::event::EventKind;
-use notify_debouncer_full::notify::{RecommendedWatcher, RecursiveMode};
+use notify_debouncer_full::notify::{
+    self, RecommendedWatcher, RecursiveMode,
+};
 use notify_debouncer_full::{
     DebounceEventResult, DebouncedEvent, Debouncer, NoCache,
     new_debouncer,
@@ -13,6 +15,23 @@ use std::sync::mpsc::Sender;
 use std::time::Duration;
 
 type WatchEventDebouncer = Debouncer<RecommendedWatcher, NoCache>;
+
+pub trait DirectoryWatcher {
+    fn watch_recursive(
+        &mut self,
+        path: &Path,
+    ) -> Result<(), notify::Error>;
+}
+
+impl DirectoryWatcher for WatchEventDebouncer {
+    fn watch_recursive(
+        &mut self,
+        path: &Path,
+    ) -> Result<(), notify::Error> {
+        self.watch(path, RecursiveMode::Recursive)
+    }
+}
+
 /// Creates and registers filesystem watchers for each entry.
 ///
 /// Returns the active debouncers, which must be kept alive for
@@ -70,12 +89,14 @@ fn create_debouncer_for_entry(
     Ok(debouncer)
 }
 
-fn watch_dirs(
-    debouncer: &mut WatchEventDebouncer,
+fn watch_dirs<W: DirectoryWatcher>(
+    watcher: &mut W,
     dirs: &[PathBuf],
 ) -> Result<(), WatcherError> {
     for dir in dirs {
-        debouncer.watch(dir, RecursiveMode::Recursive)?;
+        watcher.watch_recursive(dir).map_err(|source| {
+            WatcherError::Watch { path: dir.clone(), source }
+        })?;
     }
     Ok(())
 }
@@ -130,8 +151,12 @@ pub(super) fn handle_events(
     }
 }
 
-fn is_relevant_path(path: &Path, exts: Option<&[String]>) -> bool {
-    path.is_file() && check_extensions(path, exts)
+fn is_relevant_path(
+    path: &Path,
+    exts: Option<&[String]>,
+    is_remove: bool,
+) -> bool {
+    (is_remove || path.is_file()) && check_extensions(path, exts)
 }
 
 fn has_matching_event(
@@ -139,8 +164,13 @@ fn has_matching_event(
     exts: Option<&[String]>,
 ) -> bool {
     events.iter().inspect(|event| log_event(event)).any(|event| {
+        let is_remove = matches!(event.event.kind, EventKind::Remove(_));
+
         is_mutation(&event.event.kind)
-            && event.paths.iter().any(|path| is_relevant_path(path, exts))
+            && event
+                .paths
+                .iter()
+                .any(|path| is_relevant_path(path, exts, is_remove))
     })
 }
 
@@ -149,8 +179,10 @@ fn send_command(
     command: String,
     name: Option<String>,
 ) {
-    tracing::debug!(command = %command, "sending command event");
-    let _ = tx.send(WatchEvent::Command { cmd: command, name });
+    tracing::debug!(command = %command, "sending Command event");
+    if tx.send(WatchEvent::Command { cmd: command, name }).is_err() {
+        tracing::warn!("receiver dropped, failed to send Command event");
+    }
 }
 
 fn log_errors<E: std::fmt::Display>(errors: impl IntoIterator<Item = E>) {
@@ -179,7 +211,7 @@ fn check_extensions(
     extensions_to_filter: Option<&[String]>,
 ) -> bool {
     match extensions_to_filter {
-        None => true,
+        None | Some([]) => true,
         Some(extensions) => extensions.iter().any(|ext| {
             path.extension()
                 .and_then(|os_str| os_str.to_str())

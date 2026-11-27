@@ -3,7 +3,7 @@
 //! Creates a commented config file with example watcher
 //! entries. See [`InitError`] for failure conditions
 use std::fs::File;
-use std::io::Write;
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use thiserror::Error;
@@ -11,17 +11,18 @@ use thiserror::Error;
 /// Errors during `init` execution.
 #[derive(Error, Debug)]
 pub enum InitError {
-    /// `.watchr.toml` already exists; `init` refuses to
+    /// Config file already exists; `init` refuses to
     /// overwrite existing configs to prevent data loss.
-    #[error(".watchr.toml already exists")]
-    FileAlreadyExists,
+    #[error("config file already exists: {0}")]
+    FileAlreadyExists(std::path::PathBuf),
 
-    /// File system failure when writing `.watchr.toml`
+    /// File system failure when writing config file
     /// (e.g. permission denied, disk full, invalid path).
-    #[error("failed to write .watchr.toml: {0}")]
+    #[error("failed to write config file: {0}")]
     Io(#[from] std::io::Error),
 }
 
+const CONFIG_FILE_NAME: &str = ".watchr.toml";
 const DEFAULT_CONFIG_TEMPLATE: &str = r#"
 # watchr configuration file
 # Debounce time in milliseconds (default: 500)
@@ -60,15 +61,35 @@ debounce_ms = 500
 /// # Ok::<(), watchr::init::InitError>(())
 /// ```
 pub fn run_init(path: &Path) -> Result<(), InitError> {
-    let path = path.join(".watchr.toml");
-    if path.exists() {
-        return Err(InitError::FileAlreadyExists);
+    let config_path = path.join(CONFIG_FILE_NAME);
+    let file = open_new(&config_path)?;
+    let mut writer = BufWriter::new(file);
+    write_template(&mut writer, DEFAULT_CONFIG_TEMPLATE)
+}
+
+fn open_new(config_path: &Path) -> Result<File, InitError> {
+    if config_path.is_dir() {
+        return Err(InitError::Io(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "path is a directory",
+        )));
     }
 
-    let mut file = File::create(path)?;
+    match File::options().write(true).create_new(true).open(config_path) {
+        Ok(f) => Ok(f),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            Err(InitError::FileAlreadyExists(config_path.to_owned()))
+        }
+        Err(e) => Err(InitError::Io(e)),
+    }
+}
 
-    file.write_all(DEFAULT_CONFIG_TEMPLATE.as_bytes())?;
-    file.flush()?;
+fn write_template<W: Write>(
+    writer: &mut W,
+    template: &str,
+) -> Result<(), InitError> {
+    writer.write_all(template.as_bytes())?;
+    writer.flush()?;
     Ok(())
 }
 

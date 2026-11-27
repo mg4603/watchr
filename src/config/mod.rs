@@ -51,6 +51,10 @@ pub enum ConfigError {
     /// No config source found (neither CLI args nor config file).
     #[error("no config source found")]
     NoConfigSource,
+
+    /// At least one watcher entry has an empty directory list
+    #[error("watcher entry has no directories to watch")]
+    EmptyWatchDirs,
 }
 
 /// Configuration for watchr, deserialized from `.watchr.toml`.
@@ -120,13 +124,15 @@ fn validate_config(config: &WatcherConfig) -> Result<(), ConfigError> {
         return Err(ConfigError::NoWatcherEntriesProvided);
     }
 
-    if let Some(path) = config
-        .entries
-        .iter()
-        .flat_map(|e| e.dirs.iter())
-        .find(|p| !p.is_dir())
-    {
-        return Err(ConfigError::DirNotFound(path.to_path_buf()));
+    for entry in &config.entries {
+        if entry.dirs.is_empty() {
+            return Err(ConfigError::EmptyWatchDirs);
+        }
+        for path in &entry.dirs {
+            if !path.is_dir() {
+                return Err(ConfigError::DirNotFound(path.to_path_buf()));
+            }
+        }
     }
     Ok(())
 }

@@ -57,20 +57,20 @@ pub enum Commands {
 #[derive(Args, Debug)]
 pub struct WatchArgs {
     /// Directory to watch (CLI mode only)
-    dir: Option<PathBuf>,
+    pub dir: Option<PathBuf>,
 
     /// Comma-separated file extension to filter (e.g.,
     /// `"rs,toml"`); all files if ommitted (CLI mode only)
     #[arg(long, value_delimiter = ',')]
-    ext: Option<Vec<String>>,
+    pub ext: Option<Vec<String>>,
 
     /// Command to run on file changes (CLI mode only)
     #[arg(long)]
-    cmd: Option<String>,
+    pub cmd: Option<String>,
 
     /// Explicit path to config file, overriding discovery
     #[arg(long)]
-    config: Option<PathBuf>,
+    pub config: Option<PathBuf>,
 }
 
 impl WatchArgs {
